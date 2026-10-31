@@ -19,17 +19,28 @@ export function setupCameraControls(viewer) {
   events.subscribe('intent:ROTATE', ({ dx, dy }) => {
     const height = camera.positionCartographic.height;
     // Scale sensitivity dynamically: responsive at orbit, precise when zoomed in
-    const factor = Math.max(0.0008, Math.min(0.0035, (height / 15000000) * 0.003));
+    const factor = Math.max(0.001, Math.min(0.004, (height / 15000000) * 0.0035));
 
-    // Horizontal rotation (longitude orbit)
+    // 1. Horizontal rotation (longitude orbit around Earth's Z axis)
     camera.rotateRight(-dx * factor);
 
-    // Vertical rotation (latitude orbit) - clamp near poles to prevent gimbal flipping
+    // 2. Vertical rotation (latitude orbit)
+    // In Cesium rotateUp:
+    // deltaAngle > 0 moves camera SOUTH (towards -90°)
+    // deltaAngle < 0 moves camera NORTH (towards +90°)
+    const deltaAngle = -dy * factor;
     const currentLat = camera.positionCartographic.latitude;
-    const maxLat = Cesium.Math.toRadians(85);
-    if ((dy > 0 && currentLat > -maxLat) || (dy < 0 && currentLat < maxLat)) {
-      camera.rotateUp(-dy * factor);
+    const maxLatRad = Cesium.Math.toRadians(82); // Clamp to +/- 82 degrees to prevent polar gimbal lock
+
+    // Prevent pushing past the pole limits, but ALWAYS allow pulling back towards the equator
+    if (deltaAngle > 0 && currentLat <= -maxLatRad) {
+      return;
     }
+    if (deltaAngle < 0 && currentLat >= maxLatRad) {
+      return;
+    }
+
+    camera.rotateUp(deltaAngle);
   });
 
   // Handle ZOOM intent

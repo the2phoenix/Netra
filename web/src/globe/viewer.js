@@ -1,6 +1,6 @@
 // @ts-check
 import * as Cesium from 'cesium';
-import { createGibsImageryProvider } from './imagery.js';
+import { createBlueMarbleProvider, createDailyModisProvider } from './imagery.js';
 import { setupCameraControls } from './camera.js';
 
 /**
@@ -31,16 +31,26 @@ export function initViewer(container) {
     scene3DOnly: true,
   });
 
-  // Add GIBS true-color imagery layer
-  viewer.imageryLayers.addImageryProvider(createGibsImageryProvider());
+  // 1. Add seamless NASA Blue Marble base layer (guarantees 100% full-globe coverage)
+  viewer.imageryLayers.addImageryProvider(createBlueMarbleProvider());
+
+  // 2. Add daily MODIS true-color cloud/swath overlay on top
+  const dailyProvider = createDailyModisProvider();
+  if (dailyProvider) {
+    const dailyLayer = viewer.imageryLayers.addImageryProvider(dailyProvider);
+    dailyLayer.alpha = 0.75; // subtle blend with base layer
+  }
 
   // Globe visual tuning
   const globe = viewer.scene.globe;
   globe.enableLighting = true; // Day/night sun shading
-  globe.baseColor = Cesium.Color.fromCssColorString('#05070A');
+  // Soft ambient lighting so nighttime side shows landmass & ocean outlines instead of pitch-black void
+  globe.ambientLightColor = new Cesium.Color(0.35, 0.38, 0.45, 1.0);
+  globe.baseColor = Cesium.Color.fromCssColorString('#0B0F14');
+  globe.showGroundAtmosphere = true;
   viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#05070A');
 
-  // Disable default screen space controls; let Netra's Intent Engine control the camera
+  // Disable default screen space controls; Netra's Intent Engine controls the camera
   const controller = viewer.scene.screenSpaceCameraController;
   controller.enableRotate = false;
   controller.enableTranslate = false;
@@ -51,9 +61,9 @@ export function initViewer(container) {
   // Bind custom intent camera controls
   setupCameraControls(viewer);
 
-  // Set initial camera perspective (global orbit view)
+  // Set initial camera perspective (global orbit view showing full Earth)
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(20.0, 10.0, 20000000.0),
+    destination: Cesium.Cartesian3.fromDegrees(20.0, 15.0, 22000000.0),
   });
 
   return viewer;
