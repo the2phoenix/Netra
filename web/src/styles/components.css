@@ -1,0 +1,181 @@
+/* Top Bar HUD */
+.hud-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--topbar-height);
+  background-color: var(--panel);
+  backdrop-filter: blur(8px);
+  border-bottom: var(--border-width) solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 100;
+  font-family: var(--font-ui);
+  letter-spacing: 0.5px;
+}
+
+.hud-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text-hi);
+}
+
+.brand-sanskrit {
+  color: var(--ember);
+  font-size: 18px;
+}
+
+.utc-clock {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-metrics {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-mid);
+}
+
+.metric-item.sat .val { color: var(--sat); }
+.metric-item.air .val { color: var(--air); }
+.metric-item.quake .val { color: var(--quake); }
+.metric-item.fire .val { color: var(--fire); }
+
+.metric-item .val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-feeds {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.feed-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--panel-radius);
+  border: 1px solid var(--line);
+  background: var(--panel-solid);
+  text-transform: uppercase;
+}
+
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--off);
+}
+
+.feed-badge.live .badge-dot {
+  background: var(--live);
+  box-shadow: 0 0 6px var(--live);
+}
+.feed-badge.stale .badge-dot {
+  background: var(--stale);
+  box-shadow: 0 0 6px var(--stale);
+}
+.feed-badge.off .badge-dot {
+  background: var(--off);
+}
+
+/* Center Reticle */
+.screen-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.6;
+}
+
+.reticle-cross {
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+
+.reticle-cross::before, .reticle-cross::after {
+  content: '';
+  position: absolute;
+  background-color: var(--ember);
+}
+
+.reticle-cross::before {
+  top: 11px;
+  left: 0;
+  width: 24px;
+  height: 2px;
+}
+
+.reticle-cross::after {
+  top: 0;
+  left: 11px;
+  width: 2px;
+  height: 24px;
+}
+
+/* Replay Warning Banner */
+.replay-banner {
+  position: absolute;
+  top: var(--topbar-height);
+  left: 0;
+  width: 100%;
+  background: rgba(255, 176, 32, 0.15);
+  border-bottom: 1px solid var(--stale);
+  color: var(--stale);
+  text-align: center;
+  padding: 4px 0;
+  font-size: 12px;
+  letter-spacing: 1px;
+  font-family: var(--font-mono);
+  z-index: 90;
+  text-transform: uppercase;
+}
+
+/* Bottom info strip */
+.bottom-status {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 4px 12px;
+  border-radius: var(--panel-radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-mid);
+  z-index: 100;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}

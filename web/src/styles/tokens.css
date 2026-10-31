@@ -1,0 +1,36 @@
+:root {
+  /* Surface and Background */
+  --void: #05070A;
+  --panel: rgba(11, 15, 20, 0.88);
+  --panel-solid: #0B0F14;
+  --line: #1B2430;
+  --line-bright: #2A384A;
+
+  /* Typography */
+  --text-hi: #E6EDF3;
+  --text-mid: #8B98A8;
+  --text-lo: #5A6675;
+
+  /* Layer Brand Colors */
+  --ember: #FF6A1A;
+  --sat: #35D0E8;
+  --air: #FFB43B;
+  --quake: #FF6A1A;
+  --fire: #FF3B30;
+  --alert: #FF3B30;
+
+  /* Feed Health Badges */
+  --live: #3DDC84;
+  --stale: #FFB020;
+  --off: #6B7685;
+
+  /* Fonts */
+  --font-ui: 'Saira Condensed', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-wordmark: 'Noto Sans Devanagari', 'Saira Condensed', sans-serif;
+
+  /* Layout */
+  --topbar-height: 40px;
+  --panel-radius: 2px;
+  --border-width: 1px;
+}
