@@ -173,6 +173,18 @@ export class LayerPanel {
             </label>
           </div>
         </div>
+
+        <!-- Scan & Surveillance Section -->
+        <div class="layer-section">
+          <div class="section-title">
+            <span class="indicator alert" style="color:var(--sat)">●</span> SURVEILLANCE & SCAN
+          </div>
+          <div class="layer-items">
+            <button class="panel-action-btn" id="btnOpenScanIris" title="Toggle Scan Iris (S)">
+              <span>📡</span> OPEN SCAN IRIS
+            </button>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -275,6 +287,14 @@ export class LayerPanel {
         });
       }
     });
+
+    // Scan Iris action button
+    const btnScan = this.element.querySelector('#btnOpenScanIris');
+    if (btnScan) {
+      btnScan.addEventListener('click', () => {
+        events.emit('scan:toggle');
+      });
+    }
   }
 }
 

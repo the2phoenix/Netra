@@ -211,6 +211,11 @@ export class SatellitesLayer {
     // Request immediate telemetry
     this.requestTelemetry(noradId);
 
+    const item = this.itemMap.get(noradId);
+    if (item) {
+      events.emit('satellite:selected-item', item);
+    }
+
     // Poll live telemetry every second
     if (this.telemetryInterval) clearInterval(this.telemetryInterval);
     this.telemetryInterval = setInterval(() => {

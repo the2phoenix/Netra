@@ -9,6 +9,7 @@ import {
   KT_TO_MPS,
   FPM_TO_MPS,
 } from '../geo/deadReckoning.js';
+import { SquawkAlertManager } from '../geo/scan.js';
 
 /**
  * Creates an oriented aircraft silhouette sprite on a 24x24 canvas.
@@ -96,6 +97,7 @@ export class AircraftLayer {
     this.colorCyan = Cesium.Color.fromCssColorString('#35D0E8'); // 10k - 30k ft
     this.colorWhite = Cesium.Color.WHITE;                       // > 30k ft
     this.colorAlert = Cesium.Color.fromCssColorString('#EF4444'); // Squawk 7700 / 7600 / 7500
+    this.squawkManager = new SquawkAlertManager();
 
     // Hook frame render loop
     this.removePreRender = viewer.scene.preRender.addEventListener(this.onPreRender.bind(this));
@@ -217,6 +219,15 @@ export class AircraftLayer {
         }
       }
     }
+
+    // Process emergency squawks (FLT-03, single-fire)
+    const emergencyAlerts = this.squawkManager.processAircraft(items);
+    for (let i = 0; i < emergencyAlerts.length; i++) {
+      events.emit('squawk:alert', emergencyAlerts[i]);
+    }
+
+    // Emit live aircraft array for scan mode and geofence monitoring
+    events.emit('aircraft:updated', items);
 
     state.setCount('air', this.aircraftMap.size);
   }

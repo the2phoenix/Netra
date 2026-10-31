@@ -107,6 +107,7 @@ export class QuakesLayer {
       this.quakeMap.set(q.id, { item: q, point });
     }
 
+    events.emit('quakes:updated', items);
     state.setCount('quake', items.length);
   }
 

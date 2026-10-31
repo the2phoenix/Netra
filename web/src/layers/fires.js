@@ -97,6 +97,7 @@ export class FiresLayer {
       this.fireMap.set(key, { item: f, point });
     }
 
+    events.emit('fires:updated', items);
     state.setCount('fire', items.length);
   }
 

@@ -37,6 +37,9 @@ export class DossierPanel {
           <button class="dossier-action-btn primary" id="btnDossierFlyTo">
             <span>⌖</span> FLY TO
           </button>
+          <button class="dossier-action-btn secondary" id="btnDossierTrack" style="display:none">
+            TRACK
+          </button>
           <button class="dossier-action-btn secondary" id="btnDossierClear">
             CLEAR
           </button>
@@ -99,10 +102,18 @@ export class DossierPanel {
     const btnClose = this.element.querySelector('#dossierClose');
     const btnClear = this.element.querySelector('#btnDossierClear');
     const btnFlyTo = this.element.querySelector('#btnDossierFlyTo');
+    const btnTrack = this.element.querySelector('#btnDossierTrack');
 
     if (btnClose) btnClose.addEventListener('click', () => this.handleClear());
     if (btnClear) btnClear.addEventListener('click', () => this.handleClear());
     if (btnFlyTo) btnFlyTo.addEventListener('click', () => this.handleFlyTo());
+    if (btnTrack) {
+      btnTrack.addEventListener('click', () => {
+        if (this.currentType === 'sat') {
+          events.emit('satellite:toggle-track', this.currentId);
+        }
+      });
+    }
 
     // Keyboard shortcut Escape
     window.addEventListener('keydown', (e) => {
@@ -154,6 +165,12 @@ export class DossierPanel {
           <span class="val">${t.elementAgeDays} days</span>
         </div>
       `;
+    }
+
+    const btnTrack = /** @type {HTMLElement|null} */ (this.element.querySelector('#btnDossierTrack'));
+    if (btnTrack) {
+      btnTrack.style.display = 'flex';
+      btnTrack.textContent = 'GROUND TRACK';
     }
 
     this.element.style.display = 'flex';
@@ -209,6 +226,12 @@ export class DossierPanel {
       `;
     }
 
+    const btnTrack = /** @type {HTMLElement|null} */ (this.element.querySelector('#btnDossierTrack'));
+    if (btnTrack) {
+      btnTrack.style.display = 'flex';
+      btnTrack.textContent = 'GROUND TRACK';
+    }
+
     this.element.style.display = 'flex';
   }
 
@@ -254,6 +277,12 @@ export class DossierPanel {
       `;
     }
 
+    const btnTrack = /** @type {HTMLElement|null} */ (this.element.querySelector('#btnDossierTrack'));
+    if (btnTrack) {
+      btnTrack.style.display = 'flex';
+      btnTrack.textContent = 'GROUND TRACK';
+    }
+
     this.element.style.display = 'flex';
   }
 
@@ -291,6 +320,12 @@ export class DossierPanel {
           <span class="val">${f.lat.toFixed(2)}°, ${f.lon.toFixed(2)}°</span>
         </div>
       `;
+    }
+
+    const btnTrack = /** @type {HTMLElement|null} */ (this.element.querySelector('#btnDossierTrack'));
+    if (btnTrack) {
+      btnTrack.style.display = 'flex';
+      btnTrack.textContent = 'GROUND TRACK';
     }
 
     this.element.style.display = 'flex';

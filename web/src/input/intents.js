@@ -19,3 +19,11 @@ export const INTENT_TYPES = {
 export function emitIntent(type, payload) {
   events.emit(`intent:${type}`, payload);
 }
+
+/**
+ * Standard intents dispatcher object per trd.md section 9
+ */
+export const intents = {
+  types: INTENT_TYPES,
+  emit: emitIntent,
+};
