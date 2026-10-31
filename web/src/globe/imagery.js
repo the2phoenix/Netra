@@ -2,8 +2,8 @@
 import * as Cesium from 'cesium';
 
 /**
- * Creates NASA GIBS Blue Marble base provider.
- * Completely seamless, 100% full globe coverage with realistic oceans, topography, and landmass.
+ * 1. NASA GIBS Blue Marble Base Layer
+ * Seamless 100% full-globe coverage with topography and deep bathymetry.
  *
  * @returns {Cesium.ImageryProvider}
  */
@@ -26,8 +26,32 @@ export function createBlueMarbleProvider() {
 }
 
 /**
- * Creates NOAA-20 (JPSS-1) VIIRS True-Color satellite imagery provider from NASA GIBS.
- * Ultra high-resolution daily true-color imagery from NOAA-20 polar satellite.
+ * 2. NASA GIBS Black Marble / Earth at Night (City Lights)
+ * High-resolution golden city lights glowing on the nighttime hemisphere.
+ *
+ * @returns {Cesium.ImageryProvider|null}
+ */
+export function createCityLightsProvider() {
+  try {
+    return new Cesium.WebMapTileServiceImageryProvider({
+      url: 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/VIIRS_CityLights_2012/default/default/500m/{TileMatrix}/{TileRow}/{TileCol}.jpg',
+      layer: 'VIIRS_CityLights_2012',
+      style: 'default',
+      format: 'image/jpeg',
+      tileMatrixSetID: '500m',
+      maximumLevel: 8,
+      tilingScheme: new Cesium.GeographicTilingScheme(),
+      credit: new Cesium.Credit('NASA GIBS / Earth at Night'),
+    });
+  } catch (err) {
+    console.warn('City Lights imagery unavailable:', err);
+    return null;
+  }
+}
+
+/**
+ * 3. NOAA-20 (JPSS-1) VIIRS True-Color Daily Weather & Clouds
+ * Ultra high-resolution daily true-color satellite imagery showing real weather and cloud systems.
  *
  * @returns {Cesium.ImageryProvider|null}
  */
@@ -49,6 +73,30 @@ export function createNoaa20Provider() {
     });
   } catch (err) {
     console.warn('NOAA-20 VIIRS imagery unavailable:', err);
+    return null;
+  }
+}
+
+/**
+ * 4. NASA GIBS Geopolitical Borders & Coastlines
+ * Crisp geopolitical outlines and boundaries matching NASA Worldview.
+ *
+ * @returns {Cesium.ImageryProvider|null}
+ */
+export function createBordersProvider() {
+  try {
+    return new Cesium.WebMapTileServiceImageryProvider({
+      url: 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/Reference_Features_15m/default/default/500m/{TileMatrix}/{TileRow}/{TileCol}.png',
+      layer: 'Reference_Features_15m',
+      style: 'default',
+      format: 'image/png',
+      tileMatrixSetID: '500m',
+      maximumLevel: 8,
+      tilingScheme: new Cesium.GeographicTilingScheme(),
+      credit: new Cesium.Credit('NASA GIBS / Borders'),
+    });
+  } catch (err) {
+    console.warn('Borders overlay unavailable:', err);
     return null;
   }
 }

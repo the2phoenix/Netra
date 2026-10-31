@@ -1,11 +1,21 @@
 // @ts-check
 import * as Cesium from 'cesium';
-import { createBlueMarbleProvider, createNoaa20Provider } from './imagery.js';
+import {
+  createBlueMarbleProvider,
+  createCityLightsProvider,
+  createNoaa20Provider,
+  createBordersProvider,
+} from './imagery.js';
 import { setupCameraControls } from './camera.js';
 
 /**
  * Initializes the customized Cesium 3D Globe Viewer.
- * Strips out default widgets to fit the dark command center aesthetic.
+ * Calibrated to match NASA Eyes on the Earth & NASA Worldview:
+ * - Glowing atmospheric limb (Rayleigh scattering)
+ * - Deep-space starfield background
+ * - Dynamic Day/Night terminator with golden city lights on the night side
+ * - NOAA-20 VIIRS live weather clouds
+ * - Geopolitical borders and coastline outlines
  *
  * @param {string|HTMLElement} container
  * @returns {Cesium.Viewer}
@@ -31,26 +41,59 @@ export function initViewer(container) {
     scene3DOnly: true,
   });
 
-  // 1. Add seamless NASA Blue Marble base layer (100% full-globe coverage, zero gaps)
-  viewer.imageryLayers.addImageryProvider(createBlueMarbleProvider());
+  const layers = viewer.imageryLayers;
 
-  // 2. Add NOAA-20 (JPSS-1) VIIRS True-Color daily satellite imagery
-  const noaa20Provider = createNoaa20Provider();
-  if (noaa20Provider) {
-    const noaa20Layer = viewer.imageryLayers.addImageryProvider(noaa20Provider);
-    noaa20Layer.alpha = 0.8; // Blend cleanly with full-globe Blue Marble
+  // 1. NASA Blue Marble Base Layer (Full 360 degree coverage)
+  layers.addImageryProvider(createBlueMarbleProvider());
+
+  // 2. NASA City Lights (Earth at Night) - Glowing golden lights on the night side
+  const lightsProvider = createCityLightsProvider();
+  if (lightsProvider) {
+    const lightsLayer = layers.addImageryProvider(lightsProvider);
+    lightsLayer.dayAlpha = 0.0;
+    lightsLayer.nightAlpha = 1.0;
   }
 
-  // Globe visual tuning
-  const globe = viewer.scene.globe;
-  // Full 360 illumination so entire planet is brightly visible without night-side darkness
-  globe.enableLighting = false;
-  globe.baseColor = Cesium.Color.fromCssColorString('#0B0F14');
-  globe.showGroundAtmosphere = true;
-  viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#05070A');
+  // 3. NOAA-20 VIIRS True-Color Daily Satellite Imagery & Weather Clouds
+  const noaa20Provider = createNoaa20Provider();
+  if (noaa20Provider) {
+    const noaa20Layer = layers.addImageryProvider(noaa20Provider);
+    noaa20Layer.dayAlpha = 0.85; // Vibrant clouds on day side
+    noaa20Layer.nightAlpha = 0.0; // Fade out on night side so city lights shine
+  }
 
-  // Disable default screen space controls; Netra's Intent Engine controls the camera
-  const controller = viewer.scene.screenSpaceCameraController;
+  // 4. NASA Geopolitical Borders & Coastlines Overlay
+  const bordersProvider = createBordersProvider();
+  if (bordersProvider) {
+    const bordersLayer = layers.addImageryProvider(bordersProvider);
+    bordersLayer.alpha = 0.65;
+  }
+
+  // Visual Atmosphere & Space Lighting Calibration
+  const scene = viewer.scene;
+  const globe = scene.globe;
+
+  // Day/Night dynamic sunlight calculation
+  globe.enableLighting = true;
+  globe.dynamicAtmosphereLighting = true;
+  globe.dynamicAtmosphereLightingFromSun = true;
+
+  // Night-side ambient twilight color (deep ocean blue, never pitch black)
+  globe.ambientLightColor = new Cesium.Color(0.20, 0.24, 0.32, 1.0);
+  globe.baseColor = Cesium.Color.fromCssColorString('#061426');
+
+  // Glowing blue atmospheric halo around the perimeter (NASA Rayleigh limb scattering)
+  globe.showGroundAtmosphere = true;
+  globe.atmosphereLightIntensity = 12.0;
+  globe.atmosphereRayleighScaleHeight = 10000;
+
+  if (scene.skyAtmosphere) {
+    scene.skyAtmosphere.show = true;
+    scene.skyAtmosphere.atmosphereLightIntensity = 12.0;
+  }
+
+  // Disable default screen space controls; Netra's Intent Engine controls camera
+  const controller = scene.screenSpaceCameraController;
   controller.enableRotate = false;
   controller.enableTranslate = false;
   controller.enableZoom = false;

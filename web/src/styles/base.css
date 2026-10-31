@@ -10,7 +10,7 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: var(--void);
+  background-color: #000000;
   color: var(--text-hi);
   font-family: var(--font-ui);
   font-size: 14px;
@@ -31,7 +31,7 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  background-color: var(--void);
+  background-color: transparent;
 }
 
 /* Cesium credit container styling - keep clean and minimal */
@@ -41,3 +41,4 @@ html, body {
   color: var(--text-lo) !important;
   background: transparent !important;
 }
+
