@@ -20,6 +20,8 @@ import { events } from './core/events.js';
 import { api } from './data/api.js';
 import { SatellitesLayer } from './layers/satellites.js';
 import { AircraftLayer } from './layers/aircraft.js';
+import { QuakesLayer } from './layers/quakes.js';
+import { FiresLayer } from './layers/fires.js';
 
 async function bootstrap() {
   const container = document.getElementById('cesiumContainer');
@@ -44,11 +46,13 @@ async function bootstrap() {
   // 4. Start UTC Clock
   clock.start();
 
-  // 5. Initialize Satellite and Aircraft Layers
+  // 5. Initialize Layers (Satellites, Aircraft, Quakes, Fires)
   const satLayer = new SatellitesLayer(viewer);
   const aircraftLayer = new AircraftLayer(viewer);
+  const quakesLayer = new QuakesLayer(viewer);
+  const firesLayer = new FiresLayer(viewer);
 
-  // 6. Fetch initial health, satellites, and aircraft
+  // 6. Fetch initial health & live data feeds
   await api.fetchHealth();
 
   const satData = await api.fetchSatellites('all');
@@ -61,6 +65,16 @@ async function bootstrap() {
     aircraftLayer.updateFlights(flightData.items);
   }
 
+  const quakeData = await api.fetchQuakes(2.5, 'day');
+  if (quakeData && quakeData.items) {
+    quakesLayer.loadQuakes(quakeData.items);
+  }
+
+  const fireData = await api.fetchFires(1);
+  if (fireData && fireData.items) {
+    firesLayer.loadFires(fireData.items);
+  }
+
   // Poll live flights every 5 seconds
   setInterval(async () => {
     const data = await api.fetchFlights();
@@ -68,6 +82,14 @@ async function bootstrap() {
       aircraftLayer.updateFlights(data.items);
     }
   }, 5000);
+
+  // Poll quakes every 60 seconds
+  setInterval(async () => {
+    const data = await api.fetchQuakes(2.5, 'day');
+    if (data && data.items) {
+      quakesLayer.loadQuakes(data.items);
+    }
+  }, 60000);
 
   // Periodic health check
   setInterval(() => {
@@ -82,6 +104,8 @@ async function bootstrap() {
     events,
     satLayer,
     aircraftLayer,
+    quakesLayer,
+    firesLayer,
     layerPanel,
     dossierPanel,
     api,

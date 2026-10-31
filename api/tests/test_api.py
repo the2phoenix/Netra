@@ -192,3 +192,97 @@ async def test_get_hubs_endpoint():
         assert res.status_code == 200
         data = res.json()
         assert len(data["hubs"]) == 12
+
+
+@pytest.mark.asyncio
+async def test_t_int_06_fires_disabled_without_key():
+    """T-INT-06 No FIRMS key returns 503 fires_disabled."""
+    saved_key = settings.firms_map_key
+    settings.firms_map_key = ""
+    settings.offline_mode = False
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.get("/api/fires")
+            assert res.status_code == 503
+            data = res.json()
+            assert data["error"] == "fires_disabled"
+            assert data["reason"] == "no_key"
+
+            # Check health shows off
+            res_health = await client.get("/api/health")
+            data_health = res_health.json()
+            assert data_health["feeds"]["firms"]["state"] == "off"
+            assert data_health["feeds"]["firms"]["reason"] == "no_key"
+    finally:
+        settings.firms_map_key = saved_key
+
+
+def test_usgs_geojson_parsing():
+    """Check USGS parser correctly extracts id, mag, place, time, lat, lon, depth."""
+    from app.upstream.usgs import parse_usgs_geojson
+
+    mock_geojson = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "id": "us7000test1",
+                "properties": {
+                    "mag": 5.4,
+                    "place": "10 km SSW of Eureka, CA",
+                    "time": 1730452000000,
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [-124.2, 40.7, 18.5],
+                },
+            }
+        ],
+    }
+
+    items = parse_usgs_geojson(mock_geojson)
+    assert len(items) == 1
+    assert items[0].id == "us7000test1"
+    assert items[0].mag == 5.4
+    assert items[0].place == "10 km SSW of Eureka, CA"
+    assert items[0].lat == 40.7
+    assert items[0].lon == -124.2
+    assert items[0].depth_km == 18.5
+
+
+def test_firms_csv_parsing():
+    """Check FIRMS CSV parser sorts by highest FRP first."""
+    from app.upstream.firms import parse_firms_csv
+
+    mock_csv = """latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight
+-3.45,-62.20,340.5,0.4,0.4,2026-11-01,1730,N,nominal,2.0NRT,295.1,45.2,D
+-3.50,-62.25,365.2,0.4,0.4,2026-11-01,1730,N,high,2.0NRT,310.2,185.7,D
+"""
+    items = parse_firms_csv(mock_csv)
+    assert len(items) == 2
+    # Highest FRP first
+    assert items[0].frp == 185.7
+    assert items[0].confidence == "high"
+    assert items[1].frp == 45.2
+
+
+@pytest.mark.asyncio
+async def test_offline_mode_quakes_and_fires():
+    """Check offline mode returns fixtures for quakes and fires."""
+    settings.offline_mode = True
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res_q = await client.get("/api/quakes?min_mag=2.5")
+            assert res_q.status_code == 200
+            data_q = res_q.json()
+            assert data_q["count"] >= 10
+            assert data_q["source"] == "fixtures"
+
+            res_f = await client.get("/api/fires")
+            assert res_f.status_code == 200
+            data_f = res_f.json()
+            assert data_f["count"] >= 50
+            assert data_f["source"] == "fixtures"
+    finally:
+        settings.offline_mode = False

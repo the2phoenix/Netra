@@ -159,3 +159,4 @@ async def fetch_all_flights(client: httpx.AsyncClient) -> List[AircraftItem]:
     if not merged:
         raise httpx.RequestError("All ADS-B hub fetches failed or returned empty.")
     return merged
+

@@ -341,3 +341,4 @@ export class AircraftLayer {
     this.viewer.scene.primitives.remove(this.polylineCollection);
   }
 }
+

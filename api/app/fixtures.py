@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import List, Optional
 from app.config import settings
-from app.models import AircraftItem, SatelliteItem
+from app.models import AircraftItem, FireItem, QuakeItem, SatelliteItem
 
 
 # Minimal offline fixture for ISS if no recorded fixture exists
@@ -207,4 +207,79 @@ def load_aircraft_fixtures() -> List[AircraftItem]:
                 )
             )
 
+    return items
+
+
+def load_quake_fixtures() -> List[QuakeItem]:
+    """Load earthquake items from disk fixture or return 14 realistic global events."""
+    fixture_file = settings.fixtures_dir / "quakes.json"
+    if fixture_file.exists():
+        try:
+            with open(fixture_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return [QuakeItem(**item) for item in data.get("items", [])]
+        except Exception:
+            pass
+
+    # Deterministic 14 quakes matching wireframe W1 / W2 and testing.md
+    raw_quakes = [
+        {"id": "us7000m46a", "mag": 4.6, "place": "Hindu Kush region, Afghanistan", "time": 1730452421000, "lat": 36.52, "lon": 70.83, "depth_km": 212.0},
+        {"id": "nc75102941", "mag": 5.8, "place": "74 km W of Petrolia, California", "time": 1730449123000, "lat": 40.32, "lon": -125.12, "depth_km": 10.0},
+        {"id": "us7000m62b", "mag": 6.2, "place": "Northern Sumatra, Indonesia", "time": 1730441234000, "lat": 1.84, "lon": 98.91, "depth_km": 25.0},
+        {"id": "ak024d271f", "mag": 3.8, "place": "42 km S of Cantwell, Alaska", "time": 1730438901000, "lat": 64.21, "lon": -148.24, "depth_km": 8.5},
+        {"id": "us7000m42c", "mag": 4.2, "place": "Antofagasta, Chile", "time": 1730435678000, "lat": -21.43, "lon": -68.32, "depth_km": 110.0},
+        {"id": "us7000m51d", "mag": 5.1, "place": "Near the east coast of Honshu, Japan", "time": 1730431200000, "lat": 37.82, "lon": 141.61, "depth_km": 42.0},
+        {"id": "pr71420101", "mag": 3.1, "place": "12 km SSE of Guánica, Puerto Rico", "time": 1730428900000, "lat": 17.97, "lon": -66.88, "depth_km": 12.0},
+        {"id": "us7000m49e", "mag": 4.9, "place": "Cook Strait, New Zealand", "time": 1730425400000, "lat": -41.22, "lon": 174.91, "depth_km": 35.0},
+        {"id": "us7000m53f", "mag": 5.3, "place": "Gulf of Corinth, Greece", "time": 1730421000000, "lat": 38.25, "lon": 22.42, "depth_km": 14.0},
+        {"id": "us7000m41g", "mag": 4.1, "place": "Central Turkey", "time": 1730418900000, "lat": 37.91, "lon": 36.24, "depth_km": 10.0},
+        {"id": "us7000m60h", "mag": 6.0, "place": "Port-Vila, Vanuatu", "time": 1730415600000, "lat": -17.52, "lon": 168.14, "depth_km": 45.0},
+        {"id": "hv73120902", "mag": 3.5, "place": "14 km S of Volcano, Hawaii", "time": 1730412300000, "lat": 19.38, "lon": -155.26, "depth_km": 5.2},
+        {"id": "us7000m44i", "mag": 4.4, "place": "Samar, Philippines", "time": 1730409800000, "lat": 12.12, "lon": 124.51, "depth_km": 30.0},
+        {"id": "us7000m50j", "mag": 5.0, "place": "Reykjanes Ridge, Iceland", "time": 1730405400000, "lat": 64.02, "lon": -20.51, "depth_km": 6.0},
+    ]
+
+    return [QuakeItem(**q) for q in raw_quakes]
+
+
+def load_fire_fixtures() -> List[FireItem]:
+    """Load fire hotspots from disk fixture or return representative sample."""
+    fixture_file = settings.fixtures_dir / "fires.json"
+    if fixture_file.exists():
+        try:
+            with open(fixture_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return [FireItem(**item) for item in data.get("items", [])]
+        except Exception:
+            pass
+
+    # Representative hotspots across wildfire corridors
+    regions = [
+        {"lat": -3.46, "lon": -62.21, "count": 60},  # Amazon basin
+        {"lat": -0.78, "lon": 23.55, "count": 80},   # Congo basin
+        {"lat": -18.28, "lon": 133.51, "count": 50}, # Northern Australia
+        {"lat": 38.50, "lon": -120.20, "count": 30}, # California Sierra
+        {"lat": -2.50, "lon": 113.20, "count": 40},  # Borneo / Indonesia
+    ]
+
+    items: List[FireItem] = []
+    idx = 0
+    for reg in regions:
+        for k in range(reg["count"]):
+            idx += 1
+            lat = round(reg["lat"] + (k * 0.17) % 3.0 - 1.5, 4)
+            lon = round(reg["lon"] + (k * 0.23) % 3.0 - 1.5, 4)
+            frp = round(15.0 + (k * 7.3) % 280.0, 1)
+            items.append(
+                FireItem(
+                    lat=lat,
+                    lon=lon,
+                    frp=frp,
+                    confidence="high" if frp > 80 else "nominal",
+                    acq_time="2026-11-02 08:30",
+                    satellite="VIIRS_SNPP",
+                )
+            )
+
+    items.sort(key=lambda x: x.frp, reverse=True)
     return items

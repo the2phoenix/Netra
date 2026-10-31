@@ -87,3 +87,42 @@ class HubItem(BaseModel):
 
 class HubsResponse(BaseModel):
     hubs: List[HubItem]
+
+
+class QuakeItem(BaseModel):
+    id: str
+    mag: float
+    place: str
+    time: int
+    lat: float
+    lon: float
+    depth_km: float
+
+
+class QuakesResponse(BaseModel):
+    fetched_at: str
+    source: str = "usgs"
+    stale: bool = False
+    age_s: int = 0
+    replay: bool = False
+    count: int
+    items: List[QuakeItem]
+
+
+class FireItem(BaseModel):
+    lat: float
+    lon: float
+    frp: float
+    confidence: Optional[str] = "nominal"
+    acq_time: Optional[str] = None
+    satellite: Optional[str] = "VIIRS"
+
+
+class FiresResponse(BaseModel):
+    fetched_at: str
+    source: str = "firms"
+    stale: bool = False
+    age_s: int = 0
+    replay: bool = False
+    count: int
+    items: List[FireItem]
