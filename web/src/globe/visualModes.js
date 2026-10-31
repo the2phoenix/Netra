@@ -3,39 +3,15 @@ import * as Cesium from 'cesium';
 import { events } from '../core/events.js';
 import { state } from '../core/state.js';
 
-const NIGHT_VISION_SHADER = `
-  uniform sampler2D colorTexture;
-  varying vec2 v_textureCoordinates;
-
-  void main() {
-    vec4 color = texture2D(colorTexture, v_textureCoordinates);
-    // Perceived luminance
-    float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    
-    // Green phosphor glow
-    vec3 greenTint = vec3(0.15, 1.25, 0.35) * lum;
-    
-    // Subtle horizontal scanline effect
-    float scanline = sin(v_textureCoordinates.y * 800.0) * 0.08;
-    greenTint -= scanline;
-    
-    // Edge vignette
-    vec2 uv = (v_textureCoordinates - 0.5) * 2.0;
-    float vignette = 1.0 - dot(uv, uv) * 0.25;
-    
-    gl_FragColor = vec4(greenTint * vignette, color.a);
-  }
-`;
-
+// WebGL 2 (GLSL 3.00 ES) Thermal FLIR shader compatible with modern CesiumJS
 const THERMAL_SHADER = `
   uniform sampler2D colorTexture;
-  varying vec2 v_textureCoordinates;
+  in vec2 v_textureCoordinates;
 
-  // Ironbow FLIR false-color gradient mapping
   vec3 ironbow(float t) {
     t = clamp(t, 0.0, 1.0);
     vec3 c0 = vec3(0.0, 0.0, 0.0);      // Black (coldest)
-    vec3 c1 = vec3(0.1, 0.0, 0.6);      // Dark blue/purple
+    vec3 c1 = vec3(0.1, 0.0, 0.6);      // Dark purple
     vec3 c2 = vec3(0.8, 0.1, 0.4);      // Magenta
     vec3 c3 = vec3(1.0, 0.5, 0.0);      // Orange
     vec3 c4 = vec3(1.0, 1.0, 0.4);      // Yellow
@@ -49,9 +25,9 @@ const THERMAL_SHADER = `
   }
 
   void main() {
-    vec4 color = texture2D(colorTexture, v_textureCoordinates);
+    vec4 color = texture(colorTexture, v_textureCoordinates);
     float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    gl_FragColor = vec4(ironbow(lum), color.a);
+    out_FragColor = vec4(ironbow(lum), color.a);
   }
 `;
 
@@ -73,9 +49,8 @@ export class VisualModesManager {
 
     if (this.hasPostProcess) {
       try {
-        this.nightVisionStage = new Cesium.PostProcessStage({
-          fragmentShader: NIGHT_VISION_SHADER,
-        });
+        // Built-in official Cesium Night Vision stage
+        this.nightVisionStage = Cesium.PostProcessStageLibrary.createNightVisionStage();
         this.thermalStage = new Cesium.PostProcessStage({
           fragmentShader: THERMAL_SHADER,
         });
@@ -86,7 +61,7 @@ export class VisualModesManager {
         this.nightVisionStage.enabled = false;
         this.thermalStage.enabled = false;
       } catch (err) {
-        console.warn('PostProcessStages not supported on this device/WebGL context:', err);
+        console.warn('PostProcessStages failed to initialize, falling back to CSS filters:', err);
         this.hasPostProcess = false;
       }
     }
@@ -120,8 +95,24 @@ export class VisualModesManager {
     }
 
     if (this.hasPostProcess) {
-      if (this.nightVisionStage) this.nightVisionStage.enabled = (mode === 'night-vision');
-      if (this.thermalStage) this.thermalStage.enabled = (mode === 'thermal');
+      try {
+        if (this.nightVisionStage) this.nightVisionStage.enabled = (mode === 'night-vision');
+        if (this.thermalStage) this.thermalStage.enabled = (mode === 'thermal');
+      } catch (e) {
+        // Safe fallback
+      }
+    }
+
+    // Also apply subtle canvas CSS filter for guaranteed cross-platform rendering
+    const canvas = this.viewer.canvas;
+    if (canvas) {
+      if (mode === 'night-vision' && !this.hasPostProcess) {
+        canvas.style.filter = 'brightness(1.2) contrast(1.4) hue-rotate(90deg) saturate(2.5)';
+      } else if (mode === 'thermal' && !this.hasPostProcess) {
+        canvas.style.filter = 'invert(1) hue-rotate(180deg) saturate(3)';
+      } else {
+        canvas.style.filter = 'none';
+      }
     }
 
     state.set('mode', mode);
@@ -129,3 +120,4 @@ export class VisualModesManager {
     console.log(`Visual mode set to: ${mode.toUpperCase()}`);
   }
 }
+
