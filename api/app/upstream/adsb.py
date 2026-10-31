@@ -173,8 +173,108 @@ async def fetch_hub_aircraft(
         return []
 
 
+def normalize_opensky_state(state: list) -> Optional[AircraftItem]:
+    """Parse OpenSky state vector into AircraftItem (drops owner and private data per T-API-07)."""
+    if not isinstance(state, (list, tuple)) or len(state) < 11:
+        return None
+
+    hex_code = state[0]
+    callsign = state[1].strip() if state[1] else None
+    lon = state[5]
+    lat = state[6]
+    baro_alt = state[7]
+    on_ground = bool(state[8])
+    velocity = state[9]
+    true_track = state[10]
+    vertical_rate = state[11] if len(state) > 11 else None
+    squawk = str(state[14]).strip() if len(state) > 14 and state[14] else None
+
+    if not hex_code or lat is None or lon is None:
+        return None
+
+    try:
+        lat = float(lat)
+        lon = float(lon)
+        if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
+            return None
+    except (ValueError, TypeError):
+        return None
+
+    alt_ft = int(baro_alt * 3.28084) if baro_alt is not None else 0
+    if alt_ft < 0:
+        alt_ft = 0
+    gs_kt = float(velocity * 1.94384) if velocity is not None else 0.0
+    track_deg = float(true_track) % 360.0 if true_track is not None else 0.0
+    vs_fpm = int(vertical_rate * 196.85) if vertical_rate is not None else 0
+
+    return AircraftItem(
+        hex=str(hex_code).lower().strip(),
+        callsign=callsign,
+        type=None,
+        lat=lat,
+        lon=lon,
+        alt_ft=alt_ft,
+        gs_kt=gs_kt,
+        track_deg=track_deg,
+        vs_fpm=vs_fpm,
+        squawk=squawk,
+        seen_s=0.0,
+        on_ground=on_ground,
+    )
+
+
+def sample_global_flights(items: List[AircraftItem], limit: int = 3000) -> List[AircraftItem]:
+    """Equitably sample global flights across 12 longitude bands so all continents have balanced representation."""
+    airborne = [ac for ac in items if not ac.on_ground]
+    if not airborne:
+        return items[:limit]
+
+    bands: List[List[AircraftItem]] = [[] for _ in range(12)]
+    for ac in airborne:
+        band_idx = int((ac.lon + 180.0) / 30.0) % 12
+        bands[band_idx].append(ac)
+
+    sampled: List[AircraftItem] = []
+    max_len = max([len(b) for b in bands], default=0)
+    for idx in range(max_len):
+        for b in bands:
+            if idx < len(b):
+                sampled.append(b[idx])
+                if len(sampled) >= limit:
+                    return sampled
+
+    return sampled
+
+
+async def fetch_opensky_flights(client: httpx.AsyncClient) -> List[AircraftItem]:
+    """Fetch global airborne flights from OpenSky Network."""
+    url = "https://opensky-network.org/api/states/all"
+    headers = {"User-Agent": "Netra-Earth-Command/1.0 (student demo project)"}
+    try:
+        response = await client.get(url, headers=headers, timeout=8.0)
+        response.raise_for_status()
+        data = response.json()
+        raw_states = data.get("states", [])
+        items = []
+        for s in raw_states:
+            ac = normalize_opensky_state(s)
+            if ac:
+                items.append(ac)
+        if items:
+            return sample_global_flights(items, limit=3000)
+    except Exception as e:
+        logger.warning(f"OpenSky global flight fetch skipped/failed: {e}")
+    return []
+
+
 async def fetch_all_flights(client: httpx.AsyncClient) -> List[AircraftItem]:
-    """Fetch and merge flights from all 12 hubs concurrently."""
+    """Fetch flights globally from OpenSky Network, with adsb.lol hub fallback."""
+    # 1. Try OpenSky global feed for authentic worldwide distribution
+    global_flights = await fetch_opensky_flights(client)
+    if global_flights:
+        return global_flights
+
+    # 2. Fallback to adsb.lol hub poller
     tasks = [fetch_hub_aircraft(client, hub) for hub in HUBS]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 

@@ -43,6 +43,9 @@ function createAircraftCanvas() {
   ctx.lineTo(12, 9);
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
   return canvas;
 }
@@ -151,6 +154,7 @@ export class AircraftLayer {
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+      if (item.on_ground) continue; // Parked/ground planes excluded to prevent terminal blobbing
       const hex = item.hex;
       seenHexes.add(hex);
 
@@ -181,12 +185,13 @@ export class AircraftLayer {
         entry.easeStartTime = now;
         entry.billboard.color = color;
       } else {
-        // Create new billboard primitive
+        // Create new billboard primitive with adaptive distance scaling
         const pos = Cesium.Cartesian3.fromDegrees(item.lon, item.lat, altM);
         const billboard = this.collection.add({
           position: pos,
           image: this.spriteCanvas,
-          scale: 0.75,
+          scale: 0.55,
+          scaleByDistance: new Cesium.NearFarScalar(5.0e5, 0.75, 1.2e7, 0.22),
           color: color,
           rotation: Cesium.Math.toRadians(item.track_deg),
           id: hex,
