@@ -12,39 +12,40 @@ import {
 import { SquawkAlertManager } from '../geo/scan.js';
 
 /**
- * Creates an oriented aircraft silhouette sprite on a 24x24 canvas.
+ * Creates an oriented aircraft silhouette sprite on a 32x32 canvas.
  * @returns {HTMLCanvasElement}
  */
 function createAircraftCanvas() {
   const canvas = document.createElement('canvas');
-  canvas.width = 28;
-  canvas.height = 28;
+  canvas.width = 32;
+  canvas.height = 32;
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
 
   ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
-  // Sleek aircraft silhouette pointing straight UP (0° heading)
-  ctx.moveTo(14, 2);   // Nose
-  ctx.lineTo(16, 9);   // Cockpit right
-  ctx.lineTo(26, 17);  // Right wingtip
-  ctx.lineTo(26, 19);  // Wing edge
-  ctx.lineTo(16, 16);  // Wing root right
-  ctx.lineTo(16, 23);  // Fuselage aft
-  ctx.lineTo(20, 26);  // Right horizontal stabilizer
-  ctx.lineTo(20, 27);
-  ctx.lineTo(14, 25);  // Tail aft center
-  ctx.lineTo(8, 27);   // Left horizontal stabilizer
-  ctx.lineTo(8, 26);
-  ctx.lineTo(12, 23);
-  ctx.lineTo(12, 16);
-  ctx.lineTo(2, 19);   // Wing edge left
-  ctx.lineTo(2, 17);   // Left wingtip
-  ctx.lineTo(12, 9);
+  // Sleek aircraft silhouette pointing straight UP (0° heading) on 32x32 canvas
+  ctx.moveTo(16, 2);   // Nose tip
+  ctx.lineTo(18, 10);  // Cockpit right
+  ctx.lineTo(30, 20);  // Right wingtip
+  ctx.lineTo(30, 22);  // Right wing trailing edge
+  ctx.lineTo(18, 18);  // Wing root right
+  ctx.lineTo(18, 26);  // Fuselage aft right
+  ctx.lineTo(23, 29);  // Right horizontal stabilizer
+  ctx.lineTo(23, 30);
+  ctx.lineTo(16, 28);  // Tail aft center
+  ctx.lineTo(9, 30);   // Left horizontal stabilizer
+  ctx.lineTo(9, 29);
+  ctx.lineTo(14, 26);  // Fuselage aft left
+  ctx.lineTo(14, 18);  // Wing root left
+  ctx.lineTo(2, 22);   // Left wing trailing edge
+  ctx.lineTo(2, 20);   // Left wingtip
+  ctx.lineTo(14, 10);  // Cockpit left
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.lineWidth = 1;
+
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+  ctx.lineWidth = 1.2;
   ctx.stroke();
 
   return canvas;
@@ -70,7 +71,7 @@ export class AircraftLayer {
       color: Cesium.Color.fromCssColorString('#35D0E8').withAlpha(0.8),
       outlineColor: Cesium.Color.WHITE,
       outlineWidth: 2,
-      pixelSize: 18,
+      pixelSize: 24,
       show: false,
     });
 
@@ -185,13 +186,13 @@ export class AircraftLayer {
         entry.easeStartTime = now;
         entry.billboard.color = color;
       } else {
-        // Create new billboard primitive with adaptive distance scaling
+        // Create new billboard primitive with adaptive distance scaling (prominent aircraft size)
         const pos = Cesium.Cartesian3.fromDegrees(item.lon, item.lat, altM);
         const billboard = this.collection.add({
           position: pos,
           image: this.spriteCanvas,
-          scale: 0.55,
-          scaleByDistance: new Cesium.NearFarScalar(5.0e5, 0.75, 1.2e7, 0.22),
+          scale: 0.85,
+          scaleByDistance: new Cesium.NearFarScalar(5.0e5, 1.25, 1.2e7, 0.45),
           color: color,
           rotation: Cesium.Math.toRadians(item.track_deg),
           id: hex,
