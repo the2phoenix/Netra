@@ -47,4 +47,36 @@ export const api = {
       return null;
     }
   },
+
+  /**
+   * Fetch live aircraft positions merged across international hubs
+   */
+  async fetchFlights() {
+    try {
+      const res = await fetch(`${API_BASE}/flights?limit=3000`);
+      if (!res.ok) throw new Error(`Flights HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.replay) {
+        state.set('replay', true);
+      }
+      return data;
+    } catch (err) {
+      console.warn('Failed to fetch live flights:', err);
+      return null;
+    }
+  },
+
+  /**
+   * Fetch hub definitions
+   */
+  async fetchHubs() {
+    try {
+      const res = await fetch(`${API_BASE}/meta/hubs`);
+      if (!res.ok) throw new Error(`Hubs HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('Failed to fetch hubs:', err);
+      return null;
+    }
+  },
 };

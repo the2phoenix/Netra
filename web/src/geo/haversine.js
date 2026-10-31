@@ -94,3 +94,16 @@ export function computeBoundingBox(centerLat, centerLon, radiusM) {
 
   return { minLat, maxLat, minLon, maxLon, crossesAntimeridian };
 }
+
+/**
+ * Normalizes longitude to [-180, 180] degrees.
+ *
+ * @param {number} lon - Longitude in degrees
+ * @returns {number} Normalized longitude in [-180, 180]
+ */
+export function normalizeLongitude(lon) {
+  let l = lon % 360;
+  if (l > 180) l -= 360;
+  if (l < -180) l += 360;
+  return l;
+}

@@ -73,3 +73,4 @@ describe('SAT-01 & SAT-02 SGP4 Propagation & Telemetry Engine', () => {
     expect(duration).toBeLessThan(25); // generous headroom for test environments
   });
 });
+

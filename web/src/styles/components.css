@@ -338,6 +338,29 @@
   border: 1px solid rgba(53, 208, 232, 0.3);
 }
 
+.dossier-badge.air {
+  background: rgba(45, 212, 191, 0.15);
+  color: var(--air);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+}
+
+.dossier-badge.alert {
+  background: rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  animation: alertPulse 1.2s infinite;
+}
+
+@keyframes alertPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.dossier-row .val.alert {
+  color: #EF4444;
+  font-weight: 600;
+}
+
 .dossier-id {
   font-family: var(--font-mono);
   font-size: 12px;
