@@ -79,3 +79,4 @@ async def fetch_quakes_from_usgs(
     response.raise_for_status()
 
     return parse_usgs_geojson(response.json())
+

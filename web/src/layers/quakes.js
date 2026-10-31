@@ -147,3 +147,4 @@ export class QuakesLayer {
     this.viewer.scene.primitives.remove(this.selectionCollection);
   }
 }
+

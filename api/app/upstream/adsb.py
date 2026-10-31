@@ -11,19 +11,28 @@ from app.models import AircraftItem, HubItem
 
 logger = logging.getLogger("netra.upstream.adsb")
 
-# 12 major international hubs per trd.md 5.2
+# Global international hubs spanning Asia, Europe, Americas, Middle East, Africa, and Oceania
 HUBS: List[HubItem] = [
+    # Asia & India (High priority)
+    HubItem(name="Delhi Indira Gandhi", code="DEL", lat=28.56, lon=77.10, radius_nm=250),
+    HubItem(name="Mumbai Chhatrapati Shivaji", code="BOM", lat=19.09, lon=72.87, radius_nm=250),
+    HubItem(name="Bengaluru Kempegowda", code="BLR", lat=13.20, lon=77.71, radius_nm=250),
+    HubItem(name="Tokyo Haneda", code="HND", lat=35.55, lon=139.78, radius_nm=250),
+    HubItem(name="Singapore Changi", code="SIN", lat=1.36, lon=103.99, radius_nm=250),
+    HubItem(name="Hong Kong / Pearl Delta", code="HKG", lat=22.31, lon=113.91, radius_nm=250),
+    HubItem(name="Bangkok Suvarnabhumi", code="BKK", lat=13.69, lon=100.75, radius_nm=250),
+    HubItem(name="Dubai / Gulf Corridor", code="DXB", lat=25.25, lon=55.36, radius_nm=250),
+    # Europe
     HubItem(name="London Heathrow", code="LHR", lat=51.47, lon=-0.45, radius_nm=250),
     HubItem(name="Frankfurt", code="FRA", lat=50.03, lon=8.57, radius_nm=250),
+    HubItem(name="Paris Charles de Gaulle", code="CDG", lat=49.01, lon=2.55, radius_nm=250),
+    # Americas
     HubItem(name="New York JFK", code="JFK", lat=40.64, lon=-73.78, radius_nm=250),
     HubItem(name="Chicago O'Hare", code="ORD", lat=41.97, lon=-87.90, radius_nm=250),
     HubItem(name="Los Angeles", code="LAX", lat=33.94, lon=-118.41, radius_nm=250),
-    HubItem(name="Dubai", code="DXB", lat=25.25, lon=55.36, radius_nm=250),
-    HubItem(name="Delhi Indira Gandhi", code="DEL", lat=28.56, lon=77.10, radius_nm=250),
-    HubItem(name="Singapore Changi", code="SIN", lat=1.36, lon=103.99, radius_nm=250),
-    HubItem(name="Tokyo Haneda", code="HND", lat=35.55, lon=139.78, radius_nm=250),
-    HubItem(name="Sydney Kingsford Smith", code="SYD", lat=-33.95, lon=151.18, radius_nm=250),
     HubItem(name="Sao Paulo Guarulhos", code="GRU", lat=-23.43, lon=-46.47, radius_nm=250),
+    # Oceania & Africa
+    HubItem(name="Sydney Kingsford Smith", code="SYD", lat=-33.95, lon=151.18, radius_nm=250),
     HubItem(name="Johannesburg OR Tambo", code="JNB", lat=-26.13, lon=28.24, radius_nm=250),
 ]
 
@@ -110,7 +119,7 @@ def normalize_aircraft(raw: dict) -> Optional[AircraftItem]:
 
 
 def merge_hub_results(hub_lists: List[List[AircraftItem]]) -> List[AircraftItem]:
-    """Merge aircraft from multiple hubs, keeping the one with smallest seen_s for duplicates (T-API-08)."""
+    """Merge aircraft from multiple hubs with deduplication (T-API-08) and equitable round-robin interleaving."""
     best_by_hex: Dict[str, AircraftItem] = {}
 
     for aircraft_list in hub_lists:
@@ -119,7 +128,26 @@ def merge_hub_results(hub_lists: List[List[AircraftItem]]) -> List[AircraftItem]
             if existing is None or ac.seen_s < existing.seen_s:
                 best_by_hex[ac.hex] = ac
 
-    return list(best_by_hex.values())
+    # Group unique items by their respective hub
+    deduped_hub_lists: List[List[AircraftItem]] = []
+    for aircraft_list in hub_lists:
+        hub_unique = []
+        for ac in aircraft_list:
+            if best_by_hex.get(ac.hex) is ac:
+                hub_unique.append(ac)
+        if hub_unique:
+            deduped_hub_lists.append(hub_unique)
+
+    # Round-robin interleave across all global hubs so Asia, Americas, Europe, and Africa
+    # are equitably represented across the globe without single-region starvation
+    interleaved: List[AircraftItem] = []
+    max_len = max([len(lst) for lst in deduped_hub_lists], default=0)
+    for idx in range(max_len):
+        for hub_items in deduped_hub_lists:
+            if idx < len(hub_items):
+                interleaved.append(hub_items[idx])
+
+    return interleaved
 
 
 async def fetch_hub_aircraft(

@@ -137,3 +137,4 @@ export class FiresLayer {
     this.viewer.scene.primitives.remove(this.selectionCollection);
   }
 }
+

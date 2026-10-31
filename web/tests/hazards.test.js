@@ -46,3 +46,4 @@ describe('HAZ-01 & HAZ-02 Natural Hazards Model & Scaling', () => {
     expect(isHighIntensity(fireHigh)).toBe(true);
   });
 });
+

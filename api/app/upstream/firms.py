@@ -65,3 +65,4 @@ async def fetch_fires_from_firms(
     response.raise_for_status()
 
     return parse_firms_csv(response.text, limit=limit)
+

@@ -185,13 +185,13 @@ def test_t_api_08_hub_merge_deduplication():
 
 @pytest.mark.asyncio
 async def test_get_hubs_endpoint():
-    """Check /api/meta/hubs returns 12 hubs."""
+    """Check /api/meta/hubs returns global hubs (17 hubs)."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         res = await client.get("/api/meta/hubs")
         assert res.status_code == 200
         data = res.json()
-        assert len(data["hubs"]) == 12
+        assert len(data["hubs"]) == 17
 
 
 @pytest.mark.asyncio
