@@ -15,14 +15,18 @@ from fastapi.responses import JSONResponse
 
 from app.cache import TTLCache, UpstreamUnavailable
 from app.config import settings
-from app.fixtures import load_satellite_fixtures
+from app.fixtures import load_aircraft_fixtures, load_satellite_fixtures
 from app.models import (
+    AircraftItem,
     ErrorResponse,
     FeedHealth,
+    FlightsResponse,
     HealthResponse,
+    HubsResponse,
     SatelliteItem,
     SatellitesResponse,
 )
+from app.upstream.adsb import HUBS, fetch_all_flights
 from app.upstream.celestrak import ALLOWED_GROUPS, fetch_satellites_from_celestrak
 
 logging.basicConfig(level=settings.log_level.upper())
@@ -100,13 +104,35 @@ async def get_health() -> HealthResponse:
                 now - age, datetime.timezone.utc
             ).isoformat()
 
+    # Check ADS-B feed health
+    adsb_state = "off"
+    adsb_last_ok = None
+    adsb_age_s = None
+
+    if settings.offline_mode:
+        adsb_state = "live"
+        adsb_age_s = 0
+    elif cache:
+        existing_adsb = cache.get_existing("flights:merged")
+        if existing_adsb:
+            _, is_stale, age = existing_adsb
+            adsb_age_s = int(age)
+            adsb_state = "stale" if (is_stale or age > 60) else "live"
+            adsb_last_ok = datetime.datetime.fromtimestamp(
+                now - age, datetime.timezone.utc
+            ).isoformat()
+
     feeds: Dict[str, FeedHealth] = {
         "celestrak": FeedHealth(
             state=celestrak_state,
             last_ok=last_ok,
             age_s=age_s,
         ),
-        "adsb": FeedHealth(state="off", reason="phase_3_pending"),
+        "adsb": FeedHealth(
+            state=adsb_state,
+            last_ok=adsb_last_ok,
+            age_s=adsb_age_s,
+        ),
         "usgs": FeedHealth(state="off", reason="phase_4_pending"),
         "firms": (
             FeedHealth(state="off", reason="no_key")
@@ -192,3 +218,80 @@ async def get_satellites(
         count=len(items),
         items=items,
     )
+
+
+@app.get(
+    "/api/flights",
+    response_model=FlightsResponse,
+    responses={
+        502: {"model": ErrorResponse},
+    },
+)
+async def get_flights(
+    limit: int = Query(default=3000, ge=1, le=10000, description="Max aircraft returned"),
+):
+    """Fetch live aircraft positions merged across 12 international hubs."""
+    if settings.offline_mode:
+        fixtures = load_aircraft_fixtures()
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        return FlightsResponse(
+            fetched_at=now_iso,
+            source="fixtures",
+            stale=False,
+            age_s=0,
+            replay=True,
+            sampled=True,
+            hubs=len(HUBS),
+            count=len(fixtures),
+            items=fixtures[:limit],
+        )
+
+    cache_key = "flights:merged"
+
+    async def fetch():
+        assert client is not None
+        return await fetch_all_flights(client)
+
+    try:
+        assert cache is not None
+        # Cache flights for 5 seconds to reduce upstream load while keeping movements fresh
+        items, is_stale, age_s = await cache.get(
+            key=cache_key,
+            ttl_s=5.0,
+            fetch=fetch,
+        )
+    except UpstreamUnavailable as e:
+        # Fallback to fixtures if upstream is completely unavailable
+        logger.warning(f"ADS-B upstream unreachable ({e}), falling back to offline fixtures.")
+        fixtures = load_aircraft_fixtures()
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        return FlightsResponse(
+            fetched_at=now_iso,
+            source="fixtures",
+            stale=True,
+            age_s=int(time.time() - start_time),
+            replay=True,
+            sampled=True,
+            hubs=len(HUBS),
+            count=len(fixtures),
+            items=fixtures[:limit],
+        )
+
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return FlightsResponse(
+        fetched_at=now_iso,
+        source="adsb.lol",
+        stale=is_stale,
+        age_s=int(age_s),
+        replay=False,
+        sampled=True,
+        hubs=len(HUBS),
+        count=len(items),
+        items=items[:limit],
+    )
+
+
+@app.get("/api/meta/hubs", response_model=HubsResponse)
+async def get_hubs():
+    """Returns the list of 12 sampled flight hubs."""
+    return HubsResponse(hubs=HUBS)

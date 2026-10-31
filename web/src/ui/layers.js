@@ -40,6 +40,7 @@ export class LayerPanel {
       // Fallback
     }
     return {
+      aircraft: true,
       satellites: {
         stations: true,
         'gps-ops': true,
@@ -75,6 +76,20 @@ export class LayerPanel {
       </div>
 
       <div class="panel-content" id="layerPanelContent">
+        <!-- Live Aircraft Section -->
+        <div class="layer-section">
+          <div class="section-title">
+            <span class="indicator air">●</span> LIVE AIRCRAFT
+          </div>
+          <div class="layer-items">
+            <label class="layer-item">
+              <input type="checkbox" id="chkLayerAircraft" ${this.prefs.aircraft !== false ? 'checked' : ''}>
+              <span class="layer-dot" style="background:#2DD4BF"></span>
+              <span class="layer-label">ADS-B Traffic (Sampled)</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Satellites Section -->
         <div class="layer-section">
           <div class="section-title">
@@ -163,6 +178,18 @@ export class LayerPanel {
       }
     });
 
+    // Aircraft checkbox
+    const chkAircraft = /** @type {HTMLInputElement|null} */ (this.element.querySelector('#chkLayerAircraft'));
+    if (chkAircraft) {
+      chkAircraft.addEventListener('change', () => {
+        const visible = chkAircraft.checked;
+        this.prefs.aircraft = visible;
+        this.savePreferences();
+        state.layers.aircraft = visible;
+        events.emit('state:layers', state.layers);
+      });
+    }
+
     // Satellite checkboxes
     const satGroupMap = [
       { id: 'chkGroupStations', group: 'stations' },
@@ -205,3 +232,4 @@ export class LayerPanel {
     });
   }
 }
+

@@ -103,5 +103,92 @@ async def test_offline_mode_playback():
             data_all = res_all.json()
             assert data_all["replay"] is True
             assert data_all["count"] > 100
+
+            # Test offline mode for flights
+            res_flt = await client.get("/api/flights")
+            assert res_flt.status_code == 200
+            data_flt = res_flt.json()
+            assert data_flt["replay"] is True
+            assert data_flt["source"] == "fixtures"
+            assert data_flt["count"] > 500
     finally:
         settings.offline_mode = False
+
+
+def test_t_api_05_07_flight_normalizer():
+    """T-API-05, T-API-06, T-API-07 aircraft normalizer tests."""
+    from app.upstream.adsb import normalize_aircraft
+
+    # T-API-05: alt_baro "ground" -> alt_ft 0, on_ground True
+    ground_raw = {"hex": "abc123", "flight": "BAW1", "lat": 51.47, "lon": -0.45, "alt_baro": "ground"}
+    ac_ground = normalize_aircraft(ground_raw)
+    assert ac_ground is not None
+    assert ac_ground.alt_ft == 0
+    assert ac_ground.on_ground is True
+
+    # T-API-06: drops items without lat or lon
+    no_lat = {"hex": "abc124", "lon": -0.45, "alt_baro": 10000}
+    assert normalize_aircraft(no_lat) is None
+
+    no_lon = {"hex": "abc125", "lat": 51.47, "alt_baro": 10000}
+    assert normalize_aircraft(no_lon) is None
+
+    # T-API-07: drops registration and owner
+    with_reg = {
+        "hex": "abc126",
+        "flight": "AIC101",
+        "lat": 28.56,
+        "lon": 77.10,
+        "alt_baro": 37000,
+        "r": "VT-EXA",
+        "owner": "Private Corp",
+    }
+    ac_reg = normalize_aircraft(with_reg)
+    assert ac_reg is not None
+    assert not hasattr(ac_reg, "r")
+    assert not hasattr(ac_reg, "owner")
+    assert "r" not in ac_reg.model_dump()
+    assert "owner" not in ac_reg.model_dump()
+
+
+def test_t_api_08_hub_merge_deduplication():
+    """T-API-08 Hub merge keeps the item with smallest seen_s for a duplicate hex."""
+    from app.models import AircraftItem
+    from app.upstream.adsb import merge_hub_results
+
+    ac_older = AircraftItem(
+        hex="abc123",
+        callsign="TEST1",
+        lat=51.0,
+        lon=0.0,
+        alt_ft=30000,
+        gs_kt=450,
+        track_deg=90,
+        seen_s=15.0,
+    )
+    ac_newer = AircraftItem(
+        hex="abc123",
+        callsign="TEST1",
+        lat=51.1,
+        lon=0.1,
+        alt_ft=30000,
+        gs_kt=450,
+        track_deg=90,
+        seen_s=1.5,
+    )
+
+    merged = merge_hub_results([[ac_older], [ac_newer]])
+    assert len(merged) == 1
+    assert merged[0].seen_s == 1.5
+    assert merged[0].lat == 51.1
+
+
+@pytest.mark.asyncio
+async def test_get_hubs_endpoint():
+    """Check /api/meta/hubs returns 12 hubs."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/meta/hubs")
+        assert res.status_code == 200
+        data = res.json()
+        assert len(data["hubs"]) == 12

@@ -19,6 +19,7 @@ import { state } from './core/state.js';
 import { events } from './core/events.js';
 import { api } from './data/api.js';
 import { SatellitesLayer } from './layers/satellites.js';
+import { AircraftLayer } from './layers/aircraft.js';
 
 async function bootstrap() {
   const container = document.getElementById('cesiumContainer');
@@ -43,15 +44,30 @@ async function bootstrap() {
   // 4. Start UTC Clock
   clock.start();
 
-  // 5. Initialize Satellite Layer
+  // 5. Initialize Satellite and Aircraft Layers
   const satLayer = new SatellitesLayer(viewer);
+  const aircraftLayer = new AircraftLayer(viewer);
 
-  // 6. Fetch initial health & 2,000+ satellites across constellations
+  // 6. Fetch initial health, satellites, and aircraft
   await api.fetchHealth();
+
   const satData = await api.fetchSatellites('all');
   if (satData && satData.items) {
     satLayer.loadSatellites(satData.items);
   }
+
+  const flightData = await api.fetchFlights();
+  if (flightData && flightData.items) {
+    aircraftLayer.updateFlights(flightData.items);
+  }
+
+  // Poll live flights every 5 seconds
+  setInterval(async () => {
+    const data = await api.fetchFlights();
+    if (data && data.items) {
+      aircraftLayer.updateFlights(data.items);
+    }
+  }, 5000);
 
   // Periodic health check
   setInterval(() => {
@@ -65,6 +81,7 @@ async function bootstrap() {
     state,
     events,
     satLayer,
+    aircraftLayer,
     layerPanel,
     dossierPanel,
     api,

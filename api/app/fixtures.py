@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import List, Optional
 from app.config import settings
-from app.models import SatelliteItem
+from app.models import AircraftItem, SatelliteItem
 
 
 # Minimal offline fixture for ISS if no recorded fixture exists
@@ -113,3 +113,98 @@ def load_satellite_fixtures(group: str) -> Optional[List[SatelliteItem]]:
         return generate_synthetic_fixtures("starlink", 200)
 
     return []
+
+
+def load_aircraft_fixtures() -> List[AircraftItem]:
+    """Load aircraft items from disk fixture or generate realistic deterministic multi-hub dataset."""
+    from app.upstream.adsb import HUBS
+
+    fixture_file = settings.fixtures_dir / "flights.json"
+    if fixture_file.exists():
+        try:
+            with open(fixture_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return [AircraftItem(**item) for item in data.get("items", [])]
+        except Exception:
+            pass
+
+    # Deterministic generation across 12 hubs: ~125 aircraft per hub = 1,500 total
+    items: List[AircraftItem] = []
+
+    # Include special emergency aircraft from wireframe and test spec (T-INT-07)
+    items.append(
+        AircraftItem(
+            hex="800a1f",
+            callsign="VT-ANB",
+            type="B788",
+            lat=28.55,
+            lon=77.10,
+            alt_ft=37000,
+            gs_kt=486.0,
+            track_deg=312.4,
+            vs_fpm=0,
+            squawk="7700",
+            seen_s=1.2,
+            on_ground=False,
+        )
+    )
+
+    callsign_prefixes = {
+        "LHR": ["BAW", "VIR", "EZY"],
+        "FRA": ["DLH", "CFG", "EWG"],
+        "JFK": ["AAL", "DAL", "JBU"],
+        "ORD": ["UAL", "AAL", "ENY"],
+        "LAX": ["SWA", "DAL", "ASA"],
+        "DXB": ["UAE", "FDB", "ETD"],
+        "DEL": ["AIC", "IGO", "SEJ"],
+        "SIN": ["SIA", "SCO", "JSA"],
+        "HND": ["ANA", "JAL", "SFJ"],
+        "SYD": ["QFA", "VOZ", "JST"],
+        "GRU": ["TAM", "GLO", "AZU"],
+        "JNB": ["SAA", "CAW", "LNK"],
+    }
+    types = ["A320", "B738", "A359", "B77W", "B789", "A321", "E190", "A333"]
+
+    count_per_hub = 125
+    hex_counter = 0x400000
+
+    for hub in HUBS:
+        prefixes = callsign_prefixes.get(hub.code, ["NET"])
+        for j in range(count_per_hub):
+            hex_counter += 1
+            h = f"{hex_counter:06x}"
+            prefix = prefixes[j % len(prefixes)]
+            callsign = f"{prefix}{100 + (j * 7) % 899}"
+            ac_type = types[j % len(types)]
+
+            # Radial distribution around hub (within ~220 nm)
+            angle_rad = (j * 2.39996) % 6.28318  # Golden ratio spiral
+            dist_deg = ((j + 1) / count_per_hub) * 2.8  # Up to ~2.8 degrees (~170 nm)
+
+            ac_lat = round(hub.lat + dist_deg * 0.7 * (1.0 if j % 2 == 0 else -1.0), 4)
+            ac_lon = round(hub.lon + dist_deg * 0.9 * (1.0 if j % 3 == 0 else -1.0), 4)
+            track = round((angle_rad * 180.0 / 3.14159) % 360.0, 1)
+
+            alt = 3000 + (j * 300) % 38000
+            gs = 180.0 + (j * 3.5) % 320.0
+            vs = -500 if j % 4 == 0 else (500 if j % 4 == 1 else 0)
+            squawk = f"{(1000 + (j * 17) % 6000):04d}"
+
+            items.append(
+                AircraftItem(
+                    hex=h,
+                    callsign=callsign,
+                    type=ac_type,
+                    lat=ac_lat,
+                    lon=ac_lon,
+                    alt_ft=alt,
+                    gs_kt=round(gs, 1),
+                    track_deg=track,
+                    vs_fpm=vs,
+                    squawk=squawk,
+                    seen_s=round((j * 0.3) % 15.0, 1),
+                    on_ground=False,
+                )
+            )
+
+    return items

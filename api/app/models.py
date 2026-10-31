@@ -48,3 +48,42 @@ class SatellitesResponse(BaseModel):
     group: str
     count: int
     items: List[SatelliteItem]
+
+
+class AircraftItem(BaseModel):
+    hex: str
+    callsign: Optional[str] = None
+    type: Optional[str] = None
+    lat: float
+    lon: float
+    alt_ft: int
+    gs_kt: float
+    track_deg: float
+    vs_fpm: int = 0
+    squawk: Optional[str] = None
+    seen_s: float = 0.0
+    on_ground: bool = False
+
+
+class FlightsResponse(BaseModel):
+    fetched_at: str
+    source: str = "adsb.lol"
+    stale: bool = False
+    age_s: int = 0
+    replay: bool = False
+    sampled: bool = True
+    hubs: int = 12
+    count: int
+    items: List[AircraftItem]
+
+
+class HubItem(BaseModel):
+    name: str
+    code: str
+    lat: float
+    lon: float
+    radius_nm: int = 250
+
+
+class HubsResponse(BaseModel):
+    hubs: List[HubItem]
