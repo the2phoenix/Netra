@@ -42,3 +42,7 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+
+# Local runtime cache data
+data/
