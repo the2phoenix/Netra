@@ -1,0 +1,63 @@
+// @ts-check
+import * as Cesium from 'cesium';
+import { events } from '../core/events.js';
+import { state } from '../core/state.js';
+
+/**
+ * Connects abstract intents to Cesium camera movements.
+ *
+ * @param {Cesium.Viewer} viewer
+ */
+export function setupCameraControls(viewer) {
+  const camera = viewer.camera;
+  const scene = viewer.scene;
+
+  // Handle ROTATE intent
+  events.subscribe('intent:ROTATE', ({ dx, dy }) => {
+    const height = camera.positionCartographic.height;
+    // Scale sensitivity dynamically with altitude
+    const factor = Math.max(0.0005, Math.min(0.003, height / 20000000));
+    camera.rotateRight(-dx * factor);
+    camera.rotateUp(-dy * factor);
+  });
+
+  // Handle ZOOM intent
+  events.subscribe('intent:ZOOM', ({ dz }) => {
+    const height = camera.positionCartographic.height;
+    const amount = dz * (height / 2500);
+    if (dz > 0) {
+      camera.zoomOut(Math.abs(amount));
+    } else {
+      camera.zoomIn(Math.abs(amount));
+    }
+  });
+
+  // Handle FLY_TO intent
+  events.subscribe('intent:FLY_TO', ({ clientX, clientY }) => {
+    const cartesian = viewer.camera.pickEllipsoid(
+      new Cesium.Cartesian2(clientX, clientY),
+      scene.globe.ellipsoid
+    );
+    if (cartesian) {
+      const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+      const targetHeight = Math.max(1000000, camera.positionCartographic.height * 0.5);
+      camera.flyTo({
+        destination: Cesium.Cartesian3.fromRadians(
+          cartographic.longitude,
+          cartographic.latitude,
+          targetHeight
+        ),
+        duration: 1.5,
+      });
+    }
+  });
+
+  // Track camera position for status display
+  camera.changed.addEventListener(() => {
+    const carto = camera.positionCartographic;
+    state.camera.lat = Cesium.Math.toDegrees(carto.latitude);
+    state.camera.lon = Cesium.Math.toDegrees(carto.longitude);
+    state.camera.altKm = Math.round(carto.height / 1000);
+    events.emit('camera:updated', state.camera);
+  });
+}

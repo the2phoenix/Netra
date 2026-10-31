@@ -1,0 +1,43 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--void);
+  color: var(--text-hi);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  user-select: none;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+#cesiumContainer {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: var(--void);
+}
+
+/* Cesium credit container styling - keep clean and minimal */
+.cesium-widget-credits {
+  display: inline-block !important;
+  font-size: 10px !important;
+  color: var(--text-lo) !important;
+  background: transparent !important;
+}
