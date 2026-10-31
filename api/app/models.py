@@ -31,6 +31,7 @@ class SatelliteItem(BaseModel):
     norad_cat_id: int
     line1: str
     line2: str
+    group: Optional[str] = None
     epoch: Optional[str] = None
     inclination: Optional[float] = None
     mean_motion: Optional[float] = None

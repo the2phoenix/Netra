@@ -31,11 +31,11 @@ export const api = {
 
   /**
    * Fetch satellite orbital elements
-   * @param {string} [group='stations']
+   * @param {string} [group='all']
    */
-  async fetchSatellites(group = 'stations') {
+  async fetchSatellites(group = 'all') {
     try {
-      const res = await fetch(`${API_BASE}/satellites?group=${encodeURIComponent(group)}`);
+      const res = await fetch(`${API_BASE}/satellites?group=${encodeURIComponent(group)}&limit=3000`);
       if (!res.ok) throw new Error(`Satellites HTTP ${res.status}`);
       const data = await res.json();
       if (data.replay) {

@@ -96,5 +96,12 @@ async def test_offline_mode_playback():
             assert data["replay"] is True
             assert data["source"] == "fixtures"
             assert data["count"] >= 1
+
+            # Test offline mode for group=all returns multi-constellation
+            res_all = await client.get("/api/satellites?group=all")
+            assert res_all.status_code == 200
+            data_all = res_all.json()
+            assert data_all["replay"] is True
+            assert data_all["count"] > 100
     finally:
         settings.offline_mode = False
