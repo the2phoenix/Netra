@@ -26,29 +26,29 @@ export function createBlueMarbleProvider() {
 }
 
 /**
- * Creates NASA GIBS daily true-color satellite swath imagery.
- * Uses yesterday's UTC date to guarantee complete daylight processing.
+ * Creates NOAA-20 (JPSS-1) VIIRS True-Color satellite imagery provider from NASA GIBS.
+ * Ultra high-resolution daily true-color imagery from NOAA-20 polar satellite.
  *
  * @returns {Cesium.ImageryProvider|null}
  */
-export function createDailyModisProvider() {
+export function createNoaa20Provider() {
   const yesterday = new Date();
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
   const dateStr = yesterday.toISOString().split('T')[0];
 
   try {
     return new Cesium.WebMapTileServiceImageryProvider({
-      url: `https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${dateStr}/250m/{TileMatrix}/{TileRow}/{TileCol}.jpg`,
-      layer: 'MODIS_Terra_CorrectedReflectance_TrueColor',
+      url: `https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/VIIRS_NOAA20_CorrectedReflectance_TrueColor/default/${dateStr}/250m/{TileMatrix}/{TileRow}/{TileCol}.jpg`,
+      layer: 'VIIRS_NOAA20_CorrectedReflectance_TrueColor',
       style: 'default',
       format: 'image/jpeg',
       tileMatrixSetID: '250m',
       maximumLevel: 9,
       tilingScheme: new Cesium.GeographicTilingScheme(),
-      credit: new Cesium.Credit('NASA GIBS / Terra MODIS'),
+      credit: new Cesium.Credit('NASA GIBS / NOAA-20 VIIRS'),
     });
   } catch (err) {
-    console.warn('GIBS MODIS daily layer unavailable:', err);
+    console.warn('NOAA-20 VIIRS imagery unavailable:', err);
     return null;
   }
 }

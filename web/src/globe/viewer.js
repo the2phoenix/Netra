@@ -1,6 +1,6 @@
 // @ts-check
 import * as Cesium from 'cesium';
-import { createBlueMarbleProvider, createDailyModisProvider } from './imagery.js';
+import { createBlueMarbleProvider, createNoaa20Provider } from './imagery.js';
 import { setupCameraControls } from './camera.js';
 
 /**
@@ -31,21 +31,20 @@ export function initViewer(container) {
     scene3DOnly: true,
   });
 
-  // 1. Add seamless NASA Blue Marble base layer (guarantees 100% full-globe coverage)
+  // 1. Add seamless NASA Blue Marble base layer (100% full-globe coverage, zero gaps)
   viewer.imageryLayers.addImageryProvider(createBlueMarbleProvider());
 
-  // 2. Add daily MODIS true-color cloud/swath overlay on top
-  const dailyProvider = createDailyModisProvider();
-  if (dailyProvider) {
-    const dailyLayer = viewer.imageryLayers.addImageryProvider(dailyProvider);
-    dailyLayer.alpha = 0.75; // subtle blend with base layer
+  // 2. Add NOAA-20 (JPSS-1) VIIRS True-Color daily satellite imagery
+  const noaa20Provider = createNoaa20Provider();
+  if (noaa20Provider) {
+    const noaa20Layer = viewer.imageryLayers.addImageryProvider(noaa20Provider);
+    noaa20Layer.alpha = 0.8; // Blend cleanly with full-globe Blue Marble
   }
 
   // Globe visual tuning
   const globe = viewer.scene.globe;
-  globe.enableLighting = true; // Day/night sun shading
-  // Soft ambient lighting so nighttime side shows landmass & ocean outlines instead of pitch-black void
-  globe.ambientLightColor = new Cesium.Color(0.35, 0.38, 0.45, 1.0);
+  // Full 360 illumination so entire planet is brightly visible without night-side darkness
+  globe.enableLighting = false;
   globe.baseColor = Cesium.Color.fromCssColorString('#0B0F14');
   globe.showGroundAtmosphere = true;
   viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#05070A');
