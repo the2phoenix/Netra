@@ -3,14 +3,16 @@
 Per trd.md section 4.2, 5.4 and testing.md T-API-09.
 """
 
+import asyncio
 import logging
-from typing import List
+from typing import List, Optional
 import httpx
 from app.models import SatelliteItem
 
 logger = logging.getLogger("netra.upstream.celestrak")
 
 ALLOWED_GROUPS = {
+    "all",
     "stations",
     "gps-ops",
     "weather",
@@ -21,10 +23,14 @@ ALLOWED_GROUPS = {
     "active",
 }
 
+CORE_GROUPS = ["stations", "gps-ops", "weather", "science", "geo", "starlink"]
+
 CELESTRAK_BASE_URL = "https://celestrak.org/NORAD/elements/gp.php"
 
 
-def parse_tle_text(text: str, limit: int = 1500) -> List[SatelliteItem]:
+def parse_tle_text(
+    text: str, group: Optional[str] = None, limit: int = 1500
+) -> List[SatelliteItem]:
     """Parse 3-line or 2-line TLE blocks into SatelliteItem list with stride sampling."""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     items: List[SatelliteItem] = []
@@ -59,12 +65,28 @@ def parse_tle_text(text: str, limit: int = 1500) -> List[SatelliteItem]:
             mean_motion = float(line2[52:63].strip())
             period_min = round(1440.0 / mean_motion, 2) if mean_motion > 0 else None
 
+            # Tag group based on name or passed group
+            item_group = group
+            if not item_group:
+                lower_name = name.lower()
+                if "starlink" in lower_name:
+                    item_group = "starlink"
+                elif "iss" in lower_name or "tiangong" in lower_name or "zarya" in lower_name:
+                    item_group = "stations"
+                elif "navstar" in lower_name or "gps" in lower_name:
+                    item_group = "gps-ops"
+                elif "noaa" in lower_name or "goes" in lower_name or "meteo" in lower_name:
+                    item_group = "weather"
+                else:
+                    item_group = "science"
+
             items.append(
                 SatelliteItem(
                     name=name,
                     norad_cat_id=norad_id,
                     line1=line1,
                     line2=line2,
+                    group=item_group,
                     epoch=line1[18:32].strip(),
                     inclination=inclination,
                     mean_motion=mean_motion,
@@ -85,13 +107,10 @@ def parse_tle_text(text: str, limit: int = 1500) -> List[SatelliteItem]:
     return items
 
 
-async def fetch_satellites_from_celestrak(
+async def fetch_single_group(
     client: httpx.AsyncClient, group: str, limit: int = 1500
 ) -> List[SatelliteItem]:
-    """Fetch orbital elements for a group from CelesTrak with polite User-Agent."""
-    if group not in ALLOWED_GROUPS:
-        raise ValueError(f"group must be one of: {', '.join(sorted(ALLOWED_GROUPS))}")
-
+    """Fetch orbital elements for a single group."""
     params = {"GROUP": group, "FORMAT": "tle"}
     headers = {"User-Agent": "netra-demo/0.1 (student project; pair-programming build)"}
 
@@ -102,5 +121,45 @@ async def fetch_satellites_from_celestrak(
         timeout=8.0,
     )
     response.raise_for_status()
+    return parse_tle_text(response.text, group=group, limit=limit)
 
-    return parse_tle_text(response.text, limit=limit)
+
+async def fetch_satellites_from_celestrak(
+    client: httpx.AsyncClient, group: str, limit: int = 1500
+) -> List[SatelliteItem]:
+    """Fetch orbital elements for a group or 'all' from CelesTrak with polite User-Agent."""
+    if group not in ALLOWED_GROUPS:
+        raise ValueError(f"group must be one of: {', '.join(sorted(ALLOWED_GROUPS))}")
+
+    if group == "all":
+        # Fetch key constellations concurrently
+        group_limits = {
+            "stations": 50,
+            "gps-ops": 50,
+            "weather": 200,
+            "science": 200,
+            "geo": 600,
+            "starlink": 1500,
+        }
+        tasks = [
+            fetch_single_group(client, g, limit=group_limits.get(g, 500))
+            for g in CORE_GROUPS
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        all_items: List[SatelliteItem] = []
+        seen_ids = set()
+
+        for g, res in zip(CORE_GROUPS, results):
+            if isinstance(res, Exception):
+                logger.warning(f"Failed to fetch satellite group '{g}': {res}")
+                continue
+            for item in res:
+                if item.norad_cat_id not in seen_ids:
+                    seen_ids.add(item.norad_cat_id)
+                    all_items.append(item)
+
+        if not all_items:
+            raise httpx.RequestError("All CelesTrak group requests failed.")
+        return all_items[:limit] if limit and limit < len(all_items) else all_items
+
+    return await fetch_single_group(client, group=group, limit=limit)

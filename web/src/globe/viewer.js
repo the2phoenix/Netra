@@ -7,6 +7,7 @@ import {
   createBordersProvider,
 } from './imagery.js';
 import { setupCameraControls } from './camera.js';
+import { events } from '../core/events.js';
 
 /**
  * Initializes the customized Cesium 3D Globe Viewer.
@@ -47,27 +48,37 @@ export function initViewer(container) {
   layers.addImageryProvider(createBlueMarbleProvider());
 
   // 2. NASA City Lights (Earth at Night) - Glowing golden lights on the night side
+  let lightsLayer = null;
   const lightsProvider = createCityLightsProvider();
   if (lightsProvider) {
-    const lightsLayer = layers.addImageryProvider(lightsProvider);
+    lightsLayer = layers.addImageryProvider(lightsProvider);
     lightsLayer.dayAlpha = 0.0;
     lightsLayer.nightAlpha = 1.0;
   }
 
   // 3. NOAA-20 VIIRS True-Color Daily Satellite Imagery & Weather Clouds
+  let noaa20Layer = null;
   const noaa20Provider = createNoaa20Provider();
   if (noaa20Provider) {
-    const noaa20Layer = layers.addImageryProvider(noaa20Provider);
+    noaa20Layer = layers.addImageryProvider(noaa20Provider);
     noaa20Layer.dayAlpha = 0.85; // Vibrant clouds on day side
     noaa20Layer.nightAlpha = 0.0; // Fade out on night side so city lights shine
   }
 
   // 4. NASA Geopolitical Borders & Coastlines Overlay
+  let bordersLayer = null;
   const bordersProvider = createBordersProvider();
   if (bordersProvider) {
-    const bordersLayer = layers.addImageryProvider(bordersProvider);
+    bordersLayer = layers.addImageryProvider(bordersProvider);
     bordersLayer.alpha = 0.65;
   }
+
+  // Imagery layer visibility subscription
+  events.subscribe('imagery:toggle', ({ layer, visible }) => {
+    if (layer === 'nightLights' && lightsLayer) lightsLayer.show = visible;
+    if (layer === 'clouds' && noaa20Layer) noaa20Layer.show = visible;
+    if (layer === 'borders' && bordersLayer) bordersLayer.show = visible;
+  });
 
   // Visual Atmosphere & Space Lighting Calibration
   const scene = viewer.scene;

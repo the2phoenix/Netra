@@ -11,6 +11,8 @@ import './styles/components.css';
 
 import { initViewer } from './globe/viewer.js';
 import { initHUD } from './ui/hud.js';
+import { LayerPanel } from './ui/layers.js';
+import { DossierPanel } from './ui/dossier.js';
 import { initMouseInput } from './input/mouse.js';
 import { clock } from './core/clock.js';
 import { state } from './core/state.js';
@@ -30,8 +32,10 @@ async function bootstrap() {
   // 1. Initialize Cesium Globe
   const viewer = initViewer(container);
 
-  // 2. Initialize HUD overlay
+  // 2. Initialize HUD overlay, Layer Panel, and Dossier Panel
   initHUD(appRoot);
+  const layerPanel = new LayerPanel(appRoot);
+  const dossierPanel = new DossierPanel(appRoot);
 
   // 3. Initialize intent-based mouse input
   initMouseInput(viewer);
@@ -42,9 +46,9 @@ async function bootstrap() {
   // 5. Initialize Satellite Layer
   const satLayer = new SatellitesLayer(viewer);
 
-  // 6. Fetch initial data
+  // 6. Fetch initial health & 2,000+ satellites across constellations
   await api.fetchHealth();
-  const satData = await api.fetchSatellites('stations');
+  const satData = await api.fetchSatellites('all');
   if (satData && satData.items) {
     satLayer.loadSatellites(satData.items);
   }
@@ -61,6 +65,8 @@ async function bootstrap() {
     state,
     events,
     satLayer,
+    layerPanel,
+    dossierPanel,
     api,
   };
 

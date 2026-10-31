@@ -132,8 +132,8 @@ async def get_health() -> HealthResponse:
     },
 )
 async def get_satellites(
-    group: str = Query(default="stations", description="Satellite constellation/group"),
-    limit: int = Query(default=1500, ge=1, le=5000, description="Max satellites returned"),
+    group: str = Query(default="all", description="Satellite constellation/group (stations, gps-ops, weather, science, geo, starlink, all)"),
+    limit: int = Query(default=3000, ge=1, le=10000, description="Max satellites returned"),
 ):
     if group not in ALLOWED_GROUPS:
         return JSONResponse(
