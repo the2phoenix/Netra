@@ -10,10 +10,11 @@
     "test": "vitest"
   },
   "dependencies": {
-    "cesium": "^1.125.0",
-    "satellite.js": "^5.0.0",
+    "@fontsource/jetbrains-mono": "^5.1.0",
     "@fontsource/saira-condensed": "^5.1.0",
-    "@fontsource/jetbrains-mono": "^5.1.0"
+    "@mediapipe/tasks-vision": "^1.2.0",
+    "cesium": "^1.125.0",
+    "satellite.js": "^5.0.0"
   },
   "devDependencies": {
     "vite": "^5.4.11",

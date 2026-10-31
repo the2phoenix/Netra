@@ -28,6 +28,9 @@ import { QuakesLayer } from './layers/quakes.js';
 import { FiresLayer } from './layers/fires.js';
 import { GroundTrackLayer } from './layers/groundTrack.js';
 import { GeofenceManager } from './geo/geofence.js';
+import { GestureTracker } from './input/gestures/tracker.js';
+import { GestureHUD } from './ui/gestureHUD.js';
+import { VisualModesManager } from './globe/visualModes.js';
 
 async function bootstrap() {
   const container = document.getElementById('cesiumContainer');
@@ -54,8 +57,11 @@ async function bootstrap() {
 
   const scanMode = new ScanMode(appRoot, viewer, geofenceManager);
 
-  // 4. Initialize intent-based mouse input
+  // 4. Initialize intent-based mouse input and gesture tracking
   initMouseInput(viewer);
+  const visualModes = new VisualModesManager(viewer);
+  const gestureTracker = new GestureTracker();
+  const gestureHUD = new GestureHUD(appRoot, gestureTracker);
 
   // 5. Start UTC Clock
   clock.start();
@@ -170,10 +176,13 @@ async function bootstrap() {
     eventFeed,
     layerPanel,
     dossierPanel,
+    gestureTracker,
+    gestureHUD,
+    visualModes,
     api,
   };
 
-  console.log('NETRA Earth Command Center initialized. Phase 5 Scan & Alerts operational.');
+  console.log('NETRA Earth Command Center initialized. Phase 6 Gesture Control & Visual Modes operational.');
 }
 
 window.addEventListener('DOMContentLoaded', bootstrap);

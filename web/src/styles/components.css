@@ -871,3 +871,175 @@
   font-family: var(--font-mono);
   color: var(--text-hi);
 }
+
+/* ==========================================================================
+   Phase 6: Gesture HUD & PIP Styling
+   ========================================================================== */
+.gesture-hud-container {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  width: 176px;
+  background: rgba(10, 14, 20, 0.88);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  border-radius: var(--panel-radius);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-ui);
+}
+
+.gesture-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.gesture-hud-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hud-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-lo);
+}
+
+.hud-dot.active {
+  background: var(--air);
+  box-shadow: 0 0 8px var(--air);
+}
+
+.hud-dot.pending {
+  background: var(--ember);
+}
+
+.gesture-hud-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.hud-mini-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  color: var(--text-mid);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 5px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.hud-mini-btn:hover {
+  background: var(--sat);
+  color: #0A0E14;
+}
+
+.gesture-video-wrapper {
+  position: relative;
+  width: 160px;
+  height: 120px;
+  margin: 8px;
+  background: #000000;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.gesture-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  font-size: 9px;
+  color: var(--text-lo);
+  line-height: 1.3;
+}
+
+.gesture-placeholder span {
+  font-weight: 600;
+  color: var(--text-mid);
+  margin-bottom: 4px;
+}
+
+.gesture-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.gesture-active-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  padding: 3px 6px;
+  background: rgba(10, 14, 20, 0.85);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-align: center;
+  color: var(--text-lo);
+  border-radius: 2px;
+  z-index: 3;
+}
+
+.gesture-active-badge.pan {
+  color: var(--air);
+  border-color: var(--air);
+  background: rgba(45, 212, 191, 0.15);
+}
+
+.gesture-active-badge.zoom {
+  color: var(--sat);
+  border-color: var(--sat);
+  background: rgba(53, 208, 232, 0.15);
+}
+
+.gesture-active-badge.fly {
+  color: var(--ember);
+  border-color: var(--ember);
+  background: rgba(255, 106, 26, 0.2);
+}
+
+.gesture-active-badge.mode {
+  color: #C084FC;
+  border-color: #C084FC;
+  background: rgba(192, 132, 252, 0.2);
+}
+
+/* Central Reticle Fly Progress Ring */
+.fly-progress-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 3px solid var(--ember);
+  box-shadow: 0 0 16px var(--ember);
+  pointer-events: none;
+  z-index: 90;
+  display: none;
+  transition: transform 0.1s ease-out;
+}

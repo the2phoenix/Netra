@@ -39,3 +39,4 @@ export function createAircraftCanvas() {
 
   return canvas;
 }
+
