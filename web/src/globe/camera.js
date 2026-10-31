@@ -12,23 +12,37 @@ export function setupCameraControls(viewer) {
   const camera = viewer.camera;
   const scene = viewer.scene;
 
+  // Lock camera orientation so North is always upright
+  camera.constrainedAxis = Cesium.Cartesian3.UNIT_Z;
+
   // Handle ROTATE intent
   events.subscribe('intent:ROTATE', ({ dx, dy }) => {
     const height = camera.positionCartographic.height;
-    // Scale sensitivity dynamically with altitude
-    const factor = Math.max(0.0005, Math.min(0.003, height / 20000000));
+    // Scale sensitivity dynamically: responsive at orbit, precise when zoomed in
+    const factor = Math.max(0.0008, Math.min(0.0035, (height / 15000000) * 0.003));
+
+    // Horizontal rotation (longitude orbit)
     camera.rotateRight(-dx * factor);
-    camera.rotateUp(-dy * factor);
+
+    // Vertical rotation (latitude orbit) - clamp near poles to prevent gimbal flipping
+    const currentLat = camera.positionCartographic.latitude;
+    const maxLat = Cesium.Math.toRadians(85);
+    if ((dy > 0 && currentLat > -maxLat) || (dy < 0 && currentLat < maxLat)) {
+      camera.rotateUp(-dy * factor);
+    }
   });
 
   // Handle ZOOM intent
   events.subscribe('intent:ZOOM', ({ dz }) => {
     const height = camera.positionCartographic.height;
-    const amount = dz * (height / 2500);
+    const amount = dz * (height / 2000);
     if (dz > 0) {
       camera.zoomOut(Math.abs(amount));
     } else {
-      camera.zoomIn(Math.abs(amount));
+      // Prevent zooming inside the Earth
+      if (height > 10000) {
+        camera.zoomIn(Math.abs(amount));
+      }
     }
   });
 

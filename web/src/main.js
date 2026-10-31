@@ -34,7 +34,7 @@ async function bootstrap() {
   initHUD(appRoot);
 
   // 3. Initialize intent-based mouse input
-  initMouseInput(container);
+  initMouseInput(viewer);
 
   // 4. Start UTC Clock
   clock.start();
@@ -68,3 +68,4 @@ async function bootstrap() {
 }
 
 window.addEventListener('DOMContentLoaded', bootstrap);
+
