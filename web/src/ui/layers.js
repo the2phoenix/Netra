@@ -41,6 +41,8 @@ export class LayerPanel {
     }
     return {
       aircraft: true,
+      quakes: true,
+      fires: false,
       satellites: {
         stations: true,
         'gps-ops': true,
@@ -86,6 +88,25 @@ export class LayerPanel {
               <input type="checkbox" id="chkLayerAircraft" ${this.prefs.aircraft !== false ? 'checked' : ''}>
               <span class="layer-dot" style="background:#2DD4BF"></span>
               <span class="layer-label">ADS-B Traffic (Sampled)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Natural Hazards Section -->
+        <div class="layer-section">
+          <div class="section-title">
+            <span class="indicator alert" style="color:var(--fire)">●</span> NATURAL HAZARDS
+          </div>
+          <div class="layer-items">
+            <label class="layer-item">
+              <input type="checkbox" id="chkLayerQuakes" ${this.prefs.quakes !== false ? 'checked' : ''}>
+              <span class="layer-dot" style="background:#EF4444"></span>
+              <span class="layer-label">Earthquakes (USGS M2.5+)</span>
+            </label>
+            <label class="layer-item">
+              <input type="checkbox" id="chkLayerFires" ${this.prefs.fires ? 'checked' : ''}>
+              <span class="layer-dot" style="background:#FF6A1A"></span>
+              <span class="layer-label">Fire Hotspots (NASA FIRMS)</span>
             </label>
           </div>
         </div>
@@ -186,6 +207,30 @@ export class LayerPanel {
         this.prefs.aircraft = visible;
         this.savePreferences();
         state.layers.aircraft = visible;
+        events.emit('state:layers', state.layers);
+      });
+    }
+
+    // Quake checkbox
+    const chkQuakes = /** @type {HTMLInputElement|null} */ (this.element.querySelector('#chkLayerQuakes'));
+    if (chkQuakes) {
+      chkQuakes.addEventListener('change', () => {
+        const visible = chkQuakes.checked;
+        this.prefs.quakes = visible;
+        this.savePreferences();
+        state.layers.quakes = visible;
+        events.emit('state:layers', state.layers);
+      });
+    }
+
+    // Fire checkbox
+    const chkFires = /** @type {HTMLInputElement|null} */ (this.element.querySelector('#chkLayerFires'));
+    if (chkFires) {
+      chkFires.addEventListener('change', () => {
+        const visible = chkFires.checked;
+        this.prefs.fires = visible;
+        this.savePreferences();
+        state.layers.fires = visible;
         events.emit('state:layers', state.layers);
       });
     }

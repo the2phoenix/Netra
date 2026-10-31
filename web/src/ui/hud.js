@@ -46,6 +46,14 @@ export function initHUD(root) {
         <span class="badge-dot"></span>
         <span>ADSB</span>
       </div>
+      <div class="feed-badge off" id="badgeUsgs">
+        <span class="badge-dot"></span>
+        <span>USGS</span>
+      </div>
+      <div class="feed-badge off" id="badgeFirms">
+        <span class="badge-dot"></span>
+        <span>FIRMS</span>
+      </div>
     </div>
   `;
   root.appendChild(topbar);
@@ -79,6 +87,8 @@ export function initHUD(root) {
   const elFire = document.getElementById('hudCountFire');
   const badgeCelestrak = document.getElementById('badgeCelestrak');
   const badgeAdsb = document.getElementById('badgeAdsb');
+  const badgeUsgs = document.getElementById('badgeUsgs');
+  const badgeFirms = document.getElementById('badgeFirms');
 
   // Event subscriptions
   events.subscribe('clock:tick', ({ utcString }) => {
@@ -98,6 +108,12 @@ export function initHUD(root) {
     }
     if (badgeAdsb && feeds.adsb) {
       badgeAdsb.className = `feed-badge ${feeds.adsb.state || 'off'}`;
+    }
+    if (badgeUsgs && feeds.usgs) {
+      badgeUsgs.className = `feed-badge ${feeds.usgs.state || 'off'}`;
+    }
+    if (badgeFirms && feeds.firms) {
+      badgeFirms.className = `feed-badge ${feeds.firms.state || 'off'}`;
     }
   });
 

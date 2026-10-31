@@ -15,19 +15,30 @@ from fastapi.responses import JSONResponse
 
 from app.cache import TTLCache, UpstreamUnavailable
 from app.config import settings
-from app.fixtures import load_aircraft_fixtures, load_satellite_fixtures
+from app.fixtures import (
+    load_aircraft_fixtures,
+    load_fire_fixtures,
+    load_quake_fixtures,
+    load_satellite_fixtures,
+)
 from app.models import (
     AircraftItem,
     ErrorResponse,
     FeedHealth,
+    FireItem,
+    FiresResponse,
     FlightsResponse,
     HealthResponse,
     HubsResponse,
+    QuakeItem,
+    QuakesResponse,
     SatelliteItem,
     SatellitesResponse,
 )
 from app.upstream.adsb import HUBS, fetch_all_flights
 from app.upstream.celestrak import ALLOWED_GROUPS, fetch_satellites_from_celestrak
+from app.upstream.firms import NoFirmsKeyError, fetch_fires_from_firms
+from app.upstream.usgs import fetch_quakes_from_usgs
 
 logging.basicConfig(level=settings.log_level.upper())
 logger = logging.getLogger("netra.api")
@@ -122,6 +133,45 @@ async def get_health() -> HealthResponse:
                 now - age, datetime.timezone.utc
             ).isoformat()
 
+    # Check USGS quakes feed health
+    usgs_state = "off"
+    usgs_last_ok = None
+    usgs_age_s = None
+
+    if settings.offline_mode:
+        usgs_state = "live"
+        usgs_age_s = 0
+    elif cache:
+        existing_usgs = cache.get_existing("quakes:day:2.5")
+        if existing_usgs:
+            _, is_stale, age = existing_usgs
+            usgs_age_s = int(age)
+            usgs_state = "stale" if (is_stale or age > 120) else "live"
+            usgs_last_ok = datetime.datetime.fromtimestamp(
+                now - age, datetime.timezone.utc
+            ).isoformat()
+
+    # Check FIRMS fire hotspots feed health
+    firms_state = "off"
+    firms_last_ok = None
+    firms_age_s = None
+    firms_reason = "no_key" if not settings.firms_map_key else None
+
+    if settings.offline_mode:
+        firms_state = "live"
+        firms_age_s = 0
+        firms_reason = None
+    elif settings.firms_map_key and cache:
+        existing_firms = cache.get_existing("fires:world:1")
+        if existing_firms:
+            _, is_stale, age = existing_firms
+            firms_age_s = int(age)
+            firms_state = "stale" if (is_stale or age > 900) else "live"
+            firms_last_ok = datetime.datetime.fromtimestamp(
+                now - age, datetime.timezone.utc
+            ).isoformat()
+            firms_reason = None
+
     feeds: Dict[str, FeedHealth] = {
         "celestrak": FeedHealth(
             state=celestrak_state,
@@ -133,11 +183,16 @@ async def get_health() -> HealthResponse:
             last_ok=adsb_last_ok,
             age_s=adsb_age_s,
         ),
-        "usgs": FeedHealth(state="off", reason="phase_4_pending"),
-        "firms": (
-            FeedHealth(state="off", reason="no_key")
-            if not settings.firms_map_key
-            else FeedHealth(state="off", reason="phase_4_pending")
+        "usgs": FeedHealth(
+            state=usgs_state,
+            last_ok=usgs_last_ok,
+            age_s=usgs_age_s,
+        ),
+        "firms": FeedHealth(
+            state=firms_state,
+            last_ok=firms_last_ok,
+            age_s=firms_age_s,
+            reason=firms_reason,
         ),
     }
 
@@ -295,3 +350,147 @@ async def get_flights(
 async def get_hubs():
     """Returns the list of 12 sampled flight hubs."""
     return HubsResponse(hubs=HUBS)
+
+
+@app.get(
+    "/api/quakes",
+    response_model=QuakesResponse,
+    responses={
+        502: {"model": ErrorResponse},
+    },
+)
+async def get_quakes(
+    min_mag: float = Query(default=2.5, ge=0.0, le=10.0, description="Minimum earthquake magnitude"),
+    window: str = Query(default="day", pattern="^(hour|day|week)$", description="Time window (hour, day, week)"),
+    limit: int = Query(default=500, ge=1, le=5000),
+):
+    """Fetch live earthquakes from USGS summary feed."""
+    if settings.offline_mode:
+        fixtures = load_quake_fixtures()
+        filtered = [q for q in fixtures if q.mag >= min_mag]
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        return QuakesResponse(
+            fetched_at=now_iso,
+            source="fixtures",
+            stale=False,
+            age_s=0,
+            replay=True,
+            count=len(filtered),
+            items=filtered[:limit],
+        )
+
+    cache_key = f"quakes:{window}:{min_mag}"
+
+    async def fetch():
+        assert client is not None
+        return await fetch_quakes_from_usgs(client, min_mag=min_mag, window=window)
+
+    try:
+        assert cache is not None
+        items, is_stale, age_s = await cache.get(
+            key=cache_key,
+            ttl_s=settings.quake_cache_ttl_s,
+            fetch=fetch,
+        )
+    except UpstreamUnavailable as e:
+        logger.warning(f"USGS unreachable ({e}), falling back to offline fixtures.")
+        fixtures = load_quake_fixtures()
+        filtered = [q for q in fixtures if q.mag >= min_mag]
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        return QuakesResponse(
+            fetched_at=now_iso,
+            source="fixtures",
+            stale=True,
+            age_s=int(time.time() - start_time),
+            replay=True,
+            count=len(filtered),
+            items=filtered[:limit],
+        )
+
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return QuakesResponse(
+        fetched_at=now_iso,
+        source="usgs",
+        stale=is_stale,
+        age_s=int(age_s),
+        replay=False,
+        count=len(items),
+        items=items[:limit],
+    )
+
+
+@app.get(
+    "/api/fires",
+    response_model=FiresResponse,
+    responses={
+        503: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+    },
+)
+async def get_fires(
+    day_range: int = Query(default=1, ge=1, le=7, description="Number of past days (1-7)"),
+    limit: int = Query(default=20000, ge=1, le=20000, description="Max fire hotspots"),
+):
+    """Fetch active fire hotspots from NASA FIRMS. Requires FIRMS_MAP_KEY."""
+    if not settings.firms_map_key and not settings.offline_mode:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "error": "fires_disabled",
+                "reason": "no_key",
+                "message": "FIRMS active fire hotspot tracking is disabled because FIRMS_MAP_KEY is not configured.",
+            },
+        )
+
+    if settings.offline_mode:
+        fixtures = load_fire_fixtures()
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        return FiresResponse(
+            fetched_at=now_iso,
+            source="fixtures",
+            stale=False,
+            age_s=0,
+            replay=True,
+            count=len(fixtures),
+            items=fixtures[:limit],
+        )
+
+    cache_key = f"fires:world:{day_range}"
+
+    async def fetch():
+        assert client is not None
+        return await fetch_fires_from_firms(
+            client, map_key=settings.firms_map_key, day_range=day_range, limit=limit
+        )
+
+    try:
+        assert cache is not None
+        items, is_stale, age_s = await cache.get(
+            key=cache_key,
+            ttl_s=settings.fire_cache_ttl_s,
+            fetch=fetch,
+        )
+    except UpstreamUnavailable as e:
+        logger.warning(f"FIRMS unreachable ({e}), falling back to offline fixtures.")
+        fixtures = load_fire_fixtures()
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        return FiresResponse(
+            fetched_at=now_iso,
+            source="fixtures",
+            stale=True,
+            age_s=int(time.time() - start_time),
+            replay=True,
+            count=len(fixtures),
+            items=fixtures[:limit],
+        )
+
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return FiresResponse(
+        fetched_at=now_iso,
+        source="firms",
+        stale=is_stale,
+        age_s=int(age_s),
+        replay=False,
+        count=len(items),
+        items=items[:limit],
+    )

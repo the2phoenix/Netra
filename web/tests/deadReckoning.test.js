@@ -108,3 +108,4 @@ describe('T-GEO-07..10 & T-GEO-13 Dead Reckoning & Motion Prediction', () => {
     expect(end.altM).toBeCloseTo(10500, 0);
   });
 });
+

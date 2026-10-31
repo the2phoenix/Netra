@@ -79,4 +79,46 @@ export const api = {
       return null;
     }
   },
+
+  /**
+   * Fetch live earthquakes from USGS
+   * @param {number} [minMag=2.5]
+   * @param {string} [window='day']
+   */
+  async fetchQuakes(minMag = 2.5, window = 'day') {
+    try {
+      const res = await fetch(`${API_BASE}/quakes?min_mag=${minMag}&window=${window}`);
+      if (!res.ok) throw new Error(`Quakes HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.replay) {
+        state.set('replay', true);
+      }
+      return data;
+    } catch (err) {
+      console.warn('Failed to fetch quakes:', err);
+      return null;
+    }
+  },
+
+  /**
+   * Fetch active fire hotspots from NASA FIRMS
+   * @param {number} [dayRange=1]
+   */
+  async fetchFires(dayRange = 1) {
+    try {
+      const res = await fetch(`${API_BASE}/fires?day_range=${dayRange}`);
+      if (!res.ok) {
+        // 503 means FIRMS key is disabled
+        return null;
+      }
+      const data = await res.json();
+      if (data.replay) {
+        state.set('replay', true);
+      }
+      return data;
+    } catch (err) {
+      console.warn('Failed to fetch fires:', err);
+      return null;
+    }
+  },
 };

@@ -86,3 +86,4 @@ export function easePosition(current, target, elapsedSeconds, blendDuration = 0.
     altM: current.altM + (target.altM - current.altM) * factor,
   };
 }
+
