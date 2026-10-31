@@ -89,6 +89,12 @@ export class LayerPanel {
               <span class="layer-dot" style="background:#2DD4BF"></span>
               <span class="layer-label">ADS-B Traffic (Sampled)</span>
             </label>
+            <div class="layer-sub-legend" style="padding-left: 20px; font-size: 10px; color: #94A3B8; display: flex; flex-direction: column; gap: 3px; margin: 4px 0 6px 0;">
+              <div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#FFFFFF;margin-right:6px;"></span>White: Jet Cruise (&gt;30k ft)</div>
+              <div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#35D0E8;margin-right:6px;"></span>Cyan: Mid Cruise (10k–30k ft)</div>
+              <div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#2DD4BF;margin-right:6px;"></span>Teal: Low Alt / Climb (&lt;10k ft)</div>
+              <div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#EF4444;margin-right:6px;"></span>Red: Squawk 7700 (Alert)</div>
+            </div>
           </div>
         </div>
 

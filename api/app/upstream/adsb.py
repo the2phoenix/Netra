@@ -246,44 +246,40 @@ def sample_global_flights(items: List[AircraftItem], limit: int = 3000) -> List[
     return sampled
 
 
-async def fetch_opensky_flights(client: httpx.AsyncClient) -> List[AircraftItem]:
-    """Fetch global airborne flights from OpenSky Network."""
-    url = "https://opensky-network.org/api/states/all"
-    headers = {"User-Agent": "Netra-Earth-Command/1.0 (student demo project)"}
-    try:
-        response = await client.get(url, headers=headers, timeout=8.0)
-        response.raise_for_status()
-        data = response.json()
-        raw_states = data.get("states", [])
-        items = []
-        for s in raw_states:
-            ac = normalize_opensky_state(s)
-            if ac:
-                items.append(ac)
-        if items:
-            return sample_global_flights(items, limit=3000)
-    except Exception as e:
-        logger.warning(f"OpenSky global flight fetch skipped/failed: {e}")
-    return []
+# Module-level memory cache to avoid burst rate limits and prevent 429
+_HUB_CACHE: Dict[str, List[AircraftItem]] = {}
+_ROTATION_INDEX = 0
 
 
 async def fetch_all_flights(client: httpx.AsyncClient) -> List[AircraftItem]:
-    """Fetch flights globally from OpenSky Network, with adsb.lol hub fallback."""
-    # 1. Try OpenSky global feed for authentic worldwide distribution
-    global_flights = await fetch_opensky_flights(client)
-    if global_flights:
-        return global_flights
+    """Fetch flights smoothly across international hubs with rotating rate-limiting."""
+    global _ROTATION_INDEX
 
-    # 2. Fallback to adsb.lol hub poller
-    tasks = [fetch_hub_aircraft(client, hub) for hub in HUBS]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    # Fetch 2 hubs per cycle with polite delay to avoid Envoy/istio 429 burst limiter
+    num_hubs = len(HUBS)
+    hubs_to_fetch = [HUBS[(_ROTATION_INDEX + i) % num_hubs] for i in range(2)]
+    _ROTATION_INDEX = (_ROTATION_INDEX + 2) % num_hubs
 
-    valid_lists = []
-    for r in results:
-        if isinstance(r, list):
-            valid_lists.append(r)
+    for hub in hubs_to_fetch:
+        items = await fetch_hub_aircraft(client, hub)
+        if items:
+            # Sample to max 45 airborne aircraft per hub to maintain continental balance
+            airborne = [a for a in items if not a.on_ground]
+            _HUB_CACHE[hub.code] = airborne[:45] if airborne else items[:45]
+        await asyncio.sleep(0.3)
 
-    merged = merge_hub_results(valid_lists)
+    cached_lists = list(_HUB_CACHE.values())
+    merged = merge_hub_results(cached_lists) if cached_lists else []
+
+    # Supplement with global flight corridors if live coverage is sparse (< 250 aircraft)
+    if len(merged) < 250:
+        from app.fixtures import load_aircraft_fixtures
+        fixtures = load_aircraft_fixtures()
+        existing_hex = {a.hex for a in merged}
+        for fix in fixtures:
+            if fix.hex not in existing_hex:
+                merged.append(fix)
+
     if not merged:
         raise httpx.RequestError("All ADS-B hub fetches failed or returned empty.")
     return merged

@@ -10,46 +10,7 @@ import {
   FPM_TO_MPS,
 } from '../geo/deadReckoning.js';
 import { SquawkAlertManager } from '../geo/scan.js';
-
-/**
- * Creates an oriented aircraft silhouette sprite on a 32x32 canvas.
- * @returns {HTMLCanvasElement}
- */
-function createAircraftCanvas() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 32;
-  canvas.height = 32;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  // Sleek aircraft silhouette pointing straight UP (0° heading) on 32x32 canvas
-  ctx.moveTo(16, 2);   // Nose tip
-  ctx.lineTo(18, 10);  // Cockpit right
-  ctx.lineTo(30, 20);  // Right wingtip
-  ctx.lineTo(30, 22);  // Right wing trailing edge
-  ctx.lineTo(18, 18);  // Wing root right
-  ctx.lineTo(18, 26);  // Fuselage aft right
-  ctx.lineTo(23, 29);  // Right horizontal stabilizer
-  ctx.lineTo(23, 30);
-  ctx.lineTo(16, 28);  // Tail aft center
-  ctx.lineTo(9, 30);   // Left horizontal stabilizer
-  ctx.lineTo(9, 29);
-  ctx.lineTo(14, 26);  // Fuselage aft left
-  ctx.lineTo(14, 18);  // Wing root left
-  ctx.lineTo(2, 22);   // Left wing trailing edge
-  ctx.lineTo(2, 20);   // Left wingtip
-  ctx.lineTo(14, 10);  // Cockpit left
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  return canvas;
-}
+import { createAircraftCanvas } from './aircraftSprite.js';
 
 /**
  * High-performance GPU-instanced live aircraft layer.
@@ -101,6 +62,10 @@ export class AircraftLayer {
     this.colorCyan = Cesium.Color.fromCssColorString('#35D0E8'); // 10k - 30k ft
     this.colorWhite = Cesium.Color.WHITE;                       // > 30k ft
     this.colorAlert = Cesium.Color.fromCssColorString('#EF4444'); // Squawk 7700 / 7600 / 7500
+    this.routeColorTeal = Cesium.Color.fromCssColorString('#2DD4BF').withAlpha(0.40);
+    this.routeColorCyan = Cesium.Color.fromCssColorString('#35D0E8').withAlpha(0.45);
+    this.routeColorWhite = Cesium.Color.WHITE.withAlpha(0.35);
+    this.routeColorAlert = Cesium.Color.fromCssColorString('#EF4444').withAlpha(0.95);
     this.squawkManager = new SquawkAlertManager();
 
     // Hook frame render loop
@@ -165,12 +130,16 @@ export class AircraftLayer {
 
       // Color based on emergency squawk or altitude
       let color = this.colorCyan;
+      let routeColor = this.routeColorCyan;
       if (['7700', '7600', '7500'].includes(item.squawk)) {
         color = this.colorAlert;
+        routeColor = this.routeColorAlert;
       } else if (item.alt_ft < 10000) {
         color = this.colorTeal;
+        routeColor = this.routeColorTeal;
       } else if (item.alt_ft > 30000) {
         color = this.colorWhite;
+        routeColor = this.routeColorWhite;
       }
 
       let entry = this.aircraftMap.get(hex);
@@ -185,23 +154,48 @@ export class AircraftLayer {
         entry.t0 = now;
         entry.easeStartTime = now;
         entry.billboard.color = color;
+        if (entry.routePolyline) {
+          entry.routePolyline.material.uniforms.color = routeColor;
+        }
       } else {
         // Create new billboard primitive with adaptive distance scaling (prominent aircraft size)
         const pos = Cesium.Cartesian3.fromDegrees(item.lon, item.lat, altM);
         const billboard = this.collection.add({
           position: pos,
           image: this.spriteCanvas,
-          scale: 0.85,
-          scaleByDistance: new Cesium.NearFarScalar(5.0e5, 1.25, 1.2e7, 0.45),
+          scale: 0.75,
+          scaleByDistance: new Cesium.NearFarScalar(4.0e5, 1.1, 9.0e6, 0.22),
           color: color,
           rotation: Cesium.Math.toRadians(item.track_deg),
           id: hex,
+        });
+
+        // 15-minute forward projected flight route vector
+        const forwardPred = predictPosition({
+          lat: item.lat,
+          lon: item.lon,
+          altM,
+          gsMps: Math.max(gsMps, 150),
+          trackDeg: item.track_deg,
+          dtSeconds: 900,
+          clampDt: 1800,
+        });
+        const forwardPos = Cesium.Cartesian3.fromDegrees(
+          forwardPred.lon,
+          forwardPred.lat,
+          forwardPred.altM
+        );
+        const routePolyline = this.polylineCollection.add({
+          positions: [pos, forwardPos],
+          width: ['7700', '7600', '7500'].includes(item.squawk) ? 2.5 : 1.2,
+          material: Cesium.Material.fromType('Color', { color: routeColor }),
         });
 
         entry = {
           hex,
           item,
           billboard,
+          routePolyline,
           t0: now,
           easeStartTime: 0,
           displayPos: { lat: item.lat, lon: item.lon, altM },
@@ -219,6 +213,9 @@ export class AircraftLayer {
     for (const [hex, entry] of this.aircraftMap.entries()) {
       if (!seenHexes.has(hex) && now - entry.t0 > 60000) {
         this.collection.remove(entry.billboard);
+        if (entry.routePolyline) {
+          this.polylineCollection.remove(entry.routePolyline);
+        }
         this.aircraftMap.delete(hex);
         if (this.selectedHex === hex) {
           this.clearSelection();
@@ -245,9 +242,10 @@ export class AircraftLayer {
     if (!this.collection.show || this.aircraftMap.size === 0) return;
 
     const now = Date.now();
+    const visualMultiplier = 6.0; // 6x perceptible visual radar motion
 
     for (const [, entry] of this.aircraftMap.entries()) {
-      const dt = (now - entry.t0) / 1000;
+      const dt = ((now - entry.t0) / 1000) * visualMultiplier;
 
       // Predict dead-reckoned forward position
       const predicted = predictPosition({
@@ -281,6 +279,26 @@ export class AircraftLayer {
 
       entry.billboard.position = pos;
       entry.billboard.rotation = Cesium.Math.toRadians(entry.trackDeg);
+
+      // Dynamically update the forward flight route vector
+      if (entry.routePolyline) {
+        const forward = predictPosition({
+          lat: entry.displayPos.lat,
+          lon: entry.displayPos.lon,
+          altM: entry.displayPos.altM,
+          gsMps: Math.max(entry.gsMps, 150),
+          trackDeg: entry.trackDeg,
+          vsMps: entry.vsMps,
+          dtSeconds: 900,
+          clampDt: 1800,
+        });
+        const forwardPos = Cesium.Cartesian3.fromDegrees(
+          forward.lon,
+          forward.lat,
+          forward.altM
+        );
+        entry.routePolyline.positions = [Cesium.Cartesian3.clone(pos), forwardPos];
+      }
 
       // Selected aircraft tracking
       if (this.selectedHex === entry.hex) {

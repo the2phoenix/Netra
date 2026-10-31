@@ -42,29 +42,12 @@ GOES 16
 def generate_synthetic_fixtures(group: str, count: int = 100) -> List[SatelliteItem]:
     """Generate realistic deterministic synthetic satellite elements for offline fallback."""
     from app.upstream.celestrak import parse_tle_text
-
+    cfg = {
+        "starlink": (71000, 53.0, 15.05), "geo": (72000, 0.5, 1.0027),
+        "science": (73000, 65.0, 14.5), "gps-ops": (74000, 55.0, 2.0056),
+    }
+    base_id, inc, mm = cfg.get(group, (75000, 45.0, 15.0))
     lines = []
-    base_id = 70000
-    if group == "starlink":
-        base_id = 71000
-        inc = 53.0
-        mm = 15.05
-    elif group == "geo":
-        base_id = 72000
-        inc = 0.5
-        mm = 1.0027
-    elif group == "science":
-        base_id = 73000
-        inc = 65.0
-        mm = 14.5
-    elif group == "gps-ops":
-        base_id = 74000
-        inc = 55.0
-        mm = 2.0056
-    else:
-        base_id = 75000
-        inc = 45.0
-        mm = 15.0
 
     for i in range(count):
         norad = base_id + i
@@ -128,7 +111,7 @@ def load_aircraft_fixtures() -> List[AircraftItem]:
         except Exception:
             pass
 
-    # Deterministic generation across 12 hubs: ~125 aircraft per hub = 1,500 total
+    # Deterministic generation across major international airway corridors
     items: List[AircraftItem] = []
 
     # Include special emergency aircraft from wireframe and test spec (T-INT-07)
@@ -149,51 +132,60 @@ def load_aircraft_fixtures() -> List[AircraftItem]:
         )
     )
 
-    callsign_prefixes = {
-        "LHR": ["BAW", "VIR", "EZY"],
-        "FRA": ["DLH", "CFG", "EWG"],
-        "JFK": ["AAL", "DAL", "JBU"],
-        "ORD": ["UAL", "AAL", "ENY"],
-        "LAX": ["SWA", "DAL", "ASA"],
-        "DXB": ["UAE", "FDB", "ETD"],
-        "DEL": ["AIC", "IGO", "SEJ"],
-        "BOM": ["AIC", "IGO", "AKJ"],
-        "BLR": ["IGO", "AIC", "SEJ"],
-        "SIN": ["SIA", "SCO", "JSA"],
-        "HND": ["ANA", "JAL", "SFJ"],
-        "HKG": ["CPA", "CRK", "HDA"],
-        "BKK": ["THA", "BKP", "AIQ"],
-        "CDG": ["AFR", "TOY", "EJU"],
-        "SYD": ["QFA", "VOZ", "JST"],
-        "GRU": ["TAM", "GLO", "AZU"],
-        "JNB": ["SAA", "CAW", "LNK"],
-    }
-    types = ["A320", "B738", "A359", "B77W", "B789", "A321", "E190", "A333"]
+    import math
 
-    count_per_hub = 125
+    routes = [
+        (28.56, 77.10, 19.09, 72.87, ["AIC", "IGO", "VTI"], 35), (28.56, 77.10, 13.20, 77.71, ["IGO", "AIC", "AKJ"], 35),
+        (19.09, 72.87, 13.20, 77.71, ["SEJ", "IGO", "AIC"], 25), (28.56, 77.10, 22.65, 88.45, ["IGO", "AIC"], 25),
+        (19.09, 72.87, 25.25, 55.36, ["UAE", "AIC", "FDB"], 30), (28.56, 77.10, 51.47, -0.45, ["BAW", "AIC", "VIR"], 30),
+        (28.56, 77.10, 1.36, 103.99, ["SIA", "AIC", "SCO"], 30), (51.47, -0.45, 49.01, 2.55, ["BAW", "AFR", "EZY"], 25),
+        (50.03, 8.57, 41.80, 12.24, ["DLH", "AZA", "EWG"], 25), (51.47, -0.45, 25.25, 55.36, ["UAE", "BAW", "ETD"], 30),
+        (50.03, 8.57, 1.36, 103.99, ["SIA", "DLH"], 30), (40.64, -73.78, 51.47, -0.45, ["BAW", "VIR", "AAL"], 45),
+        (42.36, -71.01, 49.01, 2.55, ["AFR", "DAL", "UAL"], 35), (41.97, -87.90, 50.03, 8.57, ["DLH", "UAL", "AAL"], 35),
+        (40.64, -73.78, 33.94, -118.41, ["AAL", "DAL", "JBU"], 40), (41.97, -87.90, 25.79, -80.29, ["AAL", "UAL", "SWA"], 30),
+        (47.45, -122.31, 37.62, -122.37, ["ASA", "DAL"], 25), (35.55, 139.78, 42.78, 141.69, ["ANA", "JAL"], 30),
+        (35.55, 139.78, 33.58, 130.45, ["JAL", "ANA"], 30), (22.31, 113.91, 25.08, 121.23, ["CPA", "CAL"], 30),
+        (1.36, 103.99, -6.13, 106.66, ["GIA", "SIA"], 25), (33.94, -118.41, 35.55, 139.78, ["ANA", "JAL", "UAL"], 35),
+        (-33.95, 151.18, -37.67, 144.84, ["QFA", "VOZ"], 30), (-23.43, -46.47, -22.81, -43.25, ["TAM", "GLO"], 25),
+        (-26.13, 28.24, -33.97, 18.60, ["SAA", "CAW"], 25),
+    ]
+    types = ["A320", "B738", "A359", "B77W", "B789", "A321", "E190", "A333"]
     hex_counter = 0x400000
 
-    for hub in HUBS:
-        prefixes = callsign_prefixes.get(hub.code, ["NET"])
-        for j in range(count_per_hub):
+    for lat1, lon1, lat2, lon2, prefixes, count in routes:
+        # Calculate great-circle forward bearing
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        dlon = math.radians(lon2 - lon1)
+        y = math.sin(dlon) * math.cos(phi2)
+        x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(dlon)
+        forward_deg = (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
+
+        for j in range(count):
             hex_counter += 1
             h = f"{hex_counter:06x}"
             prefix = prefixes[j % len(prefixes)]
             callsign = f"{prefix}{100 + (j * 7) % 899}"
             ac_type = types[j % len(types)]
 
-            # Radial distribution around hub (within ~220 nm)
-            angle_rad = (j * 2.39996) % 6.28318  # Golden ratio spiral
-            dist_deg = ((j + 1) / count_per_hub) * 2.8  # Up to ~2.8 degrees (~170 nm)
+            # Position flight along route progress (opposing flows on alternating flights)
+            is_return = (j % 2 == 1)
+            t = (j + 1.0) / (count + 2.0)
+            if is_return:
+                t = 1.0 - t
 
-            ac_lat = round(hub.lat + dist_deg * 0.7 * (1.0 if j % 2 == 0 else -1.0), 4)
-            ac_lon = round(hub.lon + dist_deg * 0.9 * (1.0 if j % 3 == 0 else -1.0), 4)
-            track = round((angle_rad * 180.0 / 3.14159) % 360.0, 1)
+            # Subtle lateral airway deviation (+/- 0.15 deg)
+            lat_wobble = math.sin(j * 1.7) * 0.12
+            lon_wobble = math.cos(j * 1.3) * 0.12
 
-            alt = 3000 + (j * 300) % 38000
-            gs = 180.0 + (j * 3.5) % 320.0
-            vs = -500 if j % 4 == 0 else (500 if j % 4 == 1 else 0)
-            squawk = f"{(1000 + (j * 17) % 6000):04d}"
+            ac_lat = round(lat1 + (lat2 - lat1) * t + lat_wobble, 4)
+            ac_lon = round(lon1 + (lon2 - lon1) * t + lon_wobble, 4)
+            track = round((forward_deg + (180.0 if is_return else 0.0)) % 360.0, 1)
+
+            # High altitude jet cruise levels (FL300 - FL410)
+            alt = 31000 + (j * 1000) % 10000
+            gs = 440.0 + (j * 3.7) % 65.0
+            squawk = f"{(1000 + (j * 19) % 6000):04d}"
 
             items.append(
                 AircraftItem(
@@ -205,12 +197,14 @@ def load_aircraft_fixtures() -> List[AircraftItem]:
                     alt_ft=alt,
                     gs_kt=round(gs, 1),
                     track_deg=track,
-                    vs_fpm=vs,
+                    vs_fpm=0,
                     squawk=squawk,
                     seen_s=round((j * 0.3) % 15.0, 1),
                     on_ground=False,
                 )
             )
+
+    return items
 
     return items
 
