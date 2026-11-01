@@ -43,6 +43,7 @@ export class LayerPanel {
       aircraft: true,
       quakes: true,
       fires: false,
+      cctv: true,
       satellites: {
         stations: true,
         'gps-ops': true,
@@ -183,9 +184,17 @@ export class LayerPanel {
         <!-- Scan & Surveillance Section -->
         <div class="layer-section">
           <div class="section-title">
-            <span class="indicator alert" style="color:var(--sat)">●</span> SURVEILLANCE & SCAN
+            <span class="indicator alert" style="color:#00F0FF">●</span> SURVEILLANCE & RECON
           </div>
           <div class="layer-items">
+            <label class="layer-item">
+              <input type="checkbox" id="chkLayerCctv" ${this.prefs.cctv !== false ? 'checked' : ''}>
+              <span class="layer-dot" style="background:#00F0FF"></span>
+              <span class="layer-label">Global Live CCTV Nodes</span>
+            </label>
+            <button class="panel-action-btn" id="btnOpenSurveillanceCam" title="Toggle Surveillance Camera PIP (K)" style="margin-top: 4px;">
+              <span>📹</span> CAMERAS [K]
+            </button>
             <button class="panel-action-btn" id="btnOpenScanIris" title="Toggle Scan Iris (S)">
               <span>📡</span> OPEN SCAN IRIS
             </button>
@@ -293,6 +302,26 @@ export class LayerPanel {
         });
       }
     });
+
+    // CCTV checkbox
+    const chkCctv = /** @type {HTMLInputElement|null} */ (this.element.querySelector('#chkLayerCctv'));
+    if (chkCctv) {
+      chkCctv.addEventListener('change', () => {
+        const visible = chkCctv.checked;
+        this.prefs.cctv = visible;
+        this.savePreferences();
+        state.layers.cctv = visible;
+        events.emit('state:layers', state.layers);
+      });
+    }
+
+    // Surveillance Camera PIP action button
+    const btnCam = this.element.querySelector('#btnOpenSurveillanceCam');
+    if (btnCam) {
+      btnCam.addEventListener('click', () => {
+        events.emit('surveillance:toggle');
+      });
+    }
 
     // Scan Iris action button
     const btnScan = this.element.querySelector('#btnOpenScanIris');

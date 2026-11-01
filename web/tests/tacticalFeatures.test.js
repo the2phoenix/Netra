@@ -72,5 +72,41 @@ describe("Tactical Command Center Features & Flight Engine", () => {
     expect(hpr.pitch).toBeCloseTo(-12.0 * (Math.PI / 180));
     expect(hpr.range).toBe(150.0);
   });
+
+  it('T-GEV-05: Global CCTV surveillance nodes contain valid coordinates and streaming channels', async () => {
+    const { GLOBAL_CCTV_NODES } = await import('../src/layers/cctv.js');
+    expect(GLOBAL_CCTV_NODES.length).toBeGreaterThanOrEqual(5);
+
+    GLOBAL_CCTV_NODES.forEach((node) => {
+      expect(node.id).toBeDefined();
+      expect(node.name).toBeDefined();
+      expect(node.city).toBeDefined();
+      expect(node.lat).toBeGreaterThanOrEqual(-90);
+      expect(node.lat).toBeLessThanOrEqual(90);
+      expect(node.lon).toBeGreaterThanOrEqual(-180);
+      expect(node.lon).toBeLessThanOrEqual(180);
+      expect(['live', 'recon']).toContain(node.feedType);
+    });
+  });
+
+  it('T-GEV-06: Visual modes manager applies hardware-accelerated filters without WebGL shader compilation crashes', async () => {
+    const { VisualModesManager } = await import('../src/globe/visualModes.js');
+    const fakeViewer = {
+      canvas: { style: {} },
+      container: { parentNode: { appendChild: () => {} } },
+    };
+    // @ts-ignore
+    const vm = new VisualModesManager(fakeViewer);
+
+    expect(vm.modes).toEqual(['normal', 'night-vision', 'thermal']);
+    vm.setMode('night-vision');
+    expect(fakeViewer.canvas.style.filter).toContain('brightness');
+
+    vm.setMode('thermal');
+    expect(fakeViewer.canvas.style.filter).toContain('invert');
+
+    vm.setMode('normal');
+    expect(fakeViewer.canvas.style.filter).toBe('none');
+  });
 });
 

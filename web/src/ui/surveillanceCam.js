@@ -1,42 +1,24 @@
 // @ts-check
 import { events } from '../core/events.js';
+import { GLOBAL_CCTV_NODES } from '../layers/cctv.js';
 
-const CHANNELS = [
+export const CHANNELS = [
   {
     id: 'ch-recon',
     name: 'CH 01 // OVERHEAD RECON SATELLITE (EO/IR)',
     location: 'GEO-ORBITAL // ACTIVE OVERHEAD INTERCEPT',
     feedType: 'recon',
     target: 'GROUND SURVEILLANCE SWATH',
+    streamUrl: '',
   },
-  {
-    id: 'ch-shibuya',
-    name: 'CH 02 // TOKYO // SHIBUYA METROPOLITAN',
-    location: 'TOKYO, JAPAN [35.6595° N, 139.7005° E]',
-    feedType: 'traffic',
-    target: 'PEDESTRIAN CORRIDOR 04',
-  },
-  {
-    id: 'ch-times-sq',
-    name: 'CH 03 // NEW YORK // TIMES SQUARE HUB',
-    location: 'NEW YORK, USA [40.7580° N, 73.9855° W]',
-    feedType: 'traffic',
-    target: 'MIDTOWN VEHICULAR SECTOR',
-  },
-  {
-    id: 'ch-london',
-    name: 'CH 04 // LONDON // WESTMINSTER TACTICAL',
-    location: 'LONDON, UK [51.5014° N, 0.1419° W]',
-    feedType: 'traffic',
-    target: 'THAMES AIRWAY PASS',
-  },
-  {
-    id: 'ch-mumbai',
-    name: 'CH 05 // MUMBAI // COASTAL HARBOR RADAR',
-    location: 'MUMBAI, INDIA [18.9220° N, 72.8347° E]',
-    feedType: 'traffic',
-    target: 'ARABIAN SEA CORRIDOR',
-  },
+  ...GLOBAL_CCTV_NODES.map((node, idx) => ({
+    id: node.id,
+    name: node.name,
+    location: `${node.city} [${node.lat.toFixed(4)}° N, ${node.lon.toFixed(4)}° E]`,
+    feedType: node.feedType,
+    target: node.description,
+    streamUrl: node.streamUrl,
+  })),
 ];
 
 /**
@@ -65,6 +47,8 @@ export function initSurveillanceCamera(root) {
     </div>
 
     <div class="cam-viewport" id="camViewport">
+      <iframe class="cam-live-iframe" id="camIframe" allow="autoplay; encrypted-media" title="Live Surveillance Feed"></iframe>
+      <canvas class="cam-optical-canvas" id="camCanvas" width="360" height="200"></canvas>
       <div class="cam-scanlines"></div>
       <div class="cam-crosshair"></div>
       <div class="cam-osd-top">
@@ -72,10 +56,9 @@ export function initSurveillanceCamera(root) {
         <span id="camTimecode">UTC 00:00:00.000</span>
       </div>
       <div class="cam-osd-bottom">
-        <span class="cam-status-pill">SIGINT: ENCRYPTED // REC</span>
+        <span class="cam-status-pill" id="camStatusBadge">SIGINT: LIVE FEED // REC</span>
         <span id="camZoomIndicator">OPTICAL 4X</span>
       </div>
-      <canvas class="cam-optical-canvas" id="camCanvas" width="340" height="200"></canvas>
     </div>
 
     <div class="cam-controls">
@@ -99,8 +82,10 @@ export function initSurveillanceCamera(root) {
   const locEl = container.querySelector('#camLocation');
   const timecodeEl = container.querySelector('#camTimecode');
   const zoomIndEl = container.querySelector('#camZoomIndicator');
+  const statusBadgeEl = container.querySelector('#camStatusBadge');
   const filterBtn = container.querySelector('#camFilterToggle');
   const canvas = /** @type {HTMLCanvasElement} */ (container.querySelector('#camCanvas'));
+  const iframe = /** @type {HTMLIFrameElement} */ (container.querySelector('#camIframe'));
   const ctx = canvas.getContext('2d');
 
   function openCam() {
@@ -112,6 +97,7 @@ export function initSurveillanceCamera(root) {
   function closeCam() {
     container.style.display = 'none';
     isPanelOpen = false;
+    if (iframe) iframe.src = 'about:blank';
   }
 
   function toggleCam() {
@@ -121,9 +107,35 @@ export function initSurveillanceCamera(root) {
 
   function updateChannel() {
     const ch = CHANNELS[currentChannelIndex];
+    if (!ch) return;
+
     if (titleEl) titleEl.textContent = ch.name;
     if (locEl) locEl.textContent = ch.location;
     if (zoomIndEl) zoomIndEl.textContent = `OPTICAL ${zoomLevel}X`;
+
+    if (ch.feedType === 'live' && ch.streamUrl) {
+      if (canvas) canvas.style.display = 'none';
+      if (iframe) {
+        iframe.style.display = 'block';
+        if (iframe.src !== ch.streamUrl) {
+          iframe.src = ch.streamUrl;
+        }
+      }
+      if (statusBadgeEl) {
+        statusBadgeEl.textContent = 'SIGINT: LIVE CCTV STREAM // REC';
+        statusBadgeEl.style.color = '#10B981';
+      }
+    } else {
+      if (iframe) {
+        iframe.style.display = 'none';
+        iframe.src = 'about:blank';
+      }
+      if (canvas) canvas.style.display = 'block';
+      if (statusBadgeEl) {
+        statusBadgeEl.textContent = 'SIGINT: OVERHEAD RECON // REC';
+        statusBadgeEl.style.color = '#38BDF8';
+      }
+    }
   }
 
   container.querySelector('#camCloseBtn')?.addEventListener('click', closeCam);
@@ -138,7 +150,7 @@ export function initSurveillanceCamera(root) {
 
   // Zoom buttons
   container.querySelectorAll('.cam-zoom-btn').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', () => {
       container.querySelectorAll('.cam-zoom-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       zoomLevel = parseInt(btn.getAttribute('data-zoom') || '2', 10);
@@ -153,13 +165,24 @@ export function initSurveillanceCamera(root) {
       else if (currentFilter === 'IR') currentFilter = 'NVG';
       else currentFilter = 'EO';
       filterBtn.textContent = `FILTER: ${currentFilter}`;
+
+      // Apply optical filter to iframe as well
+      if (iframe) {
+        if (currentFilter === 'IR') {
+          iframe.style.filter = 'invert(1) hue-rotate(180deg) contrast(1.5)';
+        } else if (currentFilter === 'NVG') {
+          iframe.style.filter = 'brightness(1.2) contrast(1.4) hue-rotate(85deg) saturate(3)';
+        } else {
+          iframe.style.filter = 'none';
+        }
+      }
     });
   }
 
-  // Real-time canvas optical simulation loop (~20 FPS)
+  // Real-time canvas optical simulation loop (~20 FPS) for recon channels
   let frame = 0;
   setInterval(() => {
-    if (!isPanelOpen || !ctx) return;
+    if (!isPanelOpen) return;
     frame++;
 
     // Update timecode millisecond watermark
@@ -167,6 +190,8 @@ export function initSurveillanceCamera(root) {
     if (timecodeEl) {
       timecodeEl.textContent = `UTC ${now.toISOString().substring(11, 23)}`;
     }
+
+    if (!ctx || canvas.style.display === 'none') return;
 
     const w = canvas.width;
     const h = canvas.height;
@@ -230,4 +255,13 @@ export function initSurveillanceCamera(root) {
   });
 
   events.subscribe('surveillance:toggle', toggleCam);
+
+  // When a CCTV pin on the 3D globe is clicked, open and switch to that channel
+  events.subscribe('cctv:selected', (camera) => {
+    const idx = CHANNELS.findIndex((c) => c.id === camera.id);
+    if (idx !== -1) {
+      currentChannelIndex = idx;
+      openCam();
+    }
+  });
 }

@@ -115,3 +115,4 @@ export function initTargetReticle(root, viewer) {
     reticle.style.top = `${Math.round(windowCoord.y)}px`;
   });
 }
+

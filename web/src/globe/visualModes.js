@@ -1,68 +1,40 @@
 // @ts-check
-import * as Cesium from 'cesium';
 import { events } from '../core/events.js';
 import { state } from '../core/state.js';
 
-// WebGL 2 (GLSL 3.00 ES) Thermal FLIR shader compatible with modern CesiumJS
-const THERMAL_SHADER = `
-  uniform sampler2D colorTexture;
-  in vec2 v_textureCoordinates;
-
-  vec3 ironbow(float t) {
-    t = clamp(t, 0.0, 1.0);
-    vec3 c0 = vec3(0.0, 0.0, 0.0);      // Black (coldest)
-    vec3 c1 = vec3(0.1, 0.0, 0.6);      // Dark purple
-    vec3 c2 = vec3(0.8, 0.1, 0.4);      // Magenta
-    vec3 c3 = vec3(1.0, 0.5, 0.0);      // Orange
-    vec3 c4 = vec3(1.0, 1.0, 0.4);      // Yellow
-    vec3 c5 = vec3(1.0, 1.0, 1.0);      // White (hottest)
-
-    if (t < 0.2) return mix(c0, c1, t / 0.2);
-    if (t < 0.4) return mix(c1, c2, (t - 0.2) / 0.2);
-    if (t < 0.6) return mix(c2, c3, (t - 0.4) / 0.2);
-    if (t < 0.8) return mix(c3, c4, (t - 0.6) / 0.2);
-    return mix(c4, c5, (t - 0.8) / 0.2);
-  }
-
-  void main() {
-    vec4 color = texture(colorTexture, v_textureCoordinates);
-    float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    out_FragColor = vec4(ironbow(lum), color.a);
-  }
-`;
-
 /**
  * Visual Modes Manager (REQ VIS-01, GES-04)
- * Supports Normal, Night-Vision, and Thermal false-color modes.
+ * Supports Normal, Night-Vision (Phosphor Green), and Thermal FLIR (Ironbow false-color) modes.
+ * Uses high-performance, crash-free CSS/SVG hardware-accelerated rasterization.
  */
 export class VisualModesManager {
   /**
-   * @param {Cesium.Viewer} viewer
+   * @param {import('cesium').Viewer} viewer
    */
   constructor(viewer) {
     this.viewer = viewer;
     this.modes = ['normal', 'night-vision', 'thermal'];
     this.currentIndex = 0;
+    this.hasPostProcess = false;
 
-    // Check if postProcessStages are supported
-    this.hasPostProcess = Boolean(viewer.scene.postProcessStages);
-
-    if (this.hasPostProcess) {
-      try {
-        // Built-in official Cesium Night Vision stage
-        this.nightVisionStage = Cesium.PostProcessStageLibrary.createNightVisionStage();
-        this.thermalStage = new Cesium.PostProcessStage({
-          fragmentShader: THERMAL_SHADER,
-        });
-
-        viewer.scene.postProcessStages.add(this.nightVisionStage);
-        viewer.scene.postProcessStages.add(this.thermalStage);
-
-        this.nightVisionStage.enabled = false;
-        this.thermalStage.enabled = false;
-      } catch (err) {
-        console.warn('PostProcessStages failed to initialize, falling back to CSS filters:', err);
-        this.hasPostProcess = false;
+    // Create CRT / Optical scanlines and phosphor vignette overlay
+    if (typeof document !== 'undefined') {
+      this._overlay = document.createElement('div');
+      this._overlay.className = 'visual-mode-overlay';
+      this._overlay.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2;
+        display: none;
+        transition: opacity 0.3s ease;
+      `;
+      const container = viewer.container;
+      if (container && container.parentNode) {
+        container.appendChild(this._overlay);
       }
     }
 
@@ -72,11 +44,14 @@ export class VisualModesManager {
     });
 
     // Keyboard shortcut 'V' to cycle visual mode
-    window.addEventListener('keydown', (e) => {
-      if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey) {
-        this.cycleMode();
-      }
-    });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return;
+        if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey) {
+          this.cycleMode();
+        }
+      });
+    }
   }
 
   cycleMode() {
@@ -94,30 +69,36 @@ export class VisualModesManager {
       this.currentIndex = idx;
     }
 
-    if (this.hasPostProcess) {
-      try {
-        if (this.nightVisionStage) this.nightVisionStage.enabled = (mode === 'night-vision');
-        if (this.thermalStage) this.thermalStage.enabled = (mode === 'thermal');
-      } catch (e) {
-        // Safe fallback
-      }
-    }
-
-    // Also apply subtle canvas CSS filter for guaranteed cross-platform rendering
     const canvas = this.viewer.canvas;
     if (canvas) {
-      if (mode === 'night-vision' && !this.hasPostProcess) {
-        canvas.style.filter = 'brightness(1.2) contrast(1.4) hue-rotate(90deg) saturate(2.5)';
-      } else if (mode === 'thermal' && !this.hasPostProcess) {
-        canvas.style.filter = 'invert(1) hue-rotate(180deg) saturate(3)';
+      if (mode === 'night-vision') {
+        canvas.style.filter = 'brightness(1.25) contrast(1.4) hue-rotate(85deg) saturate(3.0)';
+        if (this._overlay) {
+          this._overlay.style.display = 'block';
+          this._overlay.style.background = `
+            radial-gradient(ellipse at center, transparent 65%, rgba(0, 30, 0, 0.7) 100%),
+            repeating-linear-gradient(0deg, rgba(0, 255, 65, 0.05) 0px, rgba(0, 255, 65, 0.05) 1px, transparent 1px, transparent 2px)
+          `;
+        }
+      } else if (mode === 'thermal') {
+        canvas.style.filter = 'invert(1) hue-rotate(185deg) contrast(1.5) saturate(2.8)';
+        if (this._overlay) {
+          this._overlay.style.display = 'block';
+          this._overlay.style.background = `
+            radial-gradient(ellipse at center, transparent 70%, rgba(20, 0, 40, 0.6) 100%),
+            repeating-linear-gradient(0deg, rgba(255, 100, 0, 0.04) 0px, rgba(255, 100, 0, 0.04) 1px, transparent 1px, transparent 3px)
+          `;
+        }
       } else {
         canvas.style.filter = 'none';
+        if (this._overlay) {
+          this._overlay.style.display = 'none';
+        }
       }
     }
 
     state.set('mode', mode);
     events.emit('visualMode:changed', mode);
-    console.log(`Visual mode set to: ${mode.toUpperCase()}`);
+    console.log(`[NETRA] Visual mode set to: ${mode.toUpperCase()}`);
   }
 }
-

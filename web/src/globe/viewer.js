@@ -11,10 +11,16 @@ import {
 import { setupCameraControls } from './camera.js';
 import { events } from '../core/events.js';
 
+// User's Google Maps Photorealistic 3D Tiles API Key ($200/mo recurring credit tier)
+const GOOGLE_MAPS_API_KEY =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_KEY) ||
+  (typeof localStorage !== 'undefined' && localStorage.getItem('NETRA_GOOGLE_MAPS_KEY')) ||
+  'AIzaSyAZu8mjUqiOqEaeNWVILfp2Tyd1vLkcexQ';
+
 /**
  * Initializes the customized Cesium 3D Globe Viewer.
- * High-definition sub-meter spatial command center:
- * - Sub-meter satellite imagery (ESRI World Imagery level 19)
+ * High-definition sub-meter tactical spatial command center:
+ * - Google Photorealistic 3D Tiles with ESRI sub-meter level 19 satellite fallback
  * - True 3D mountain elevation terrain (ArcGIS Terrain3D)
  * - Dynamic Day/Night terminator with golden city lights on night side
  * - Calibrated atmospheric limb and delicate weather clouds
@@ -43,6 +49,12 @@ export function initViewer(container) {
     scene3DOnly: true,
   });
 
+  // Intercept and handle any WebGL driver/pipeline errors so rendering never permanently halts
+  viewer.scene.renderError.addEventListener((_scene, error) => {
+    console.warn('[NETRA] WebGL render glitch intercepted, maintaining frame loop:', error);
+    viewer.useDefaultRenderLoop = true;
+  });
+
   const layers = viewer.imageryLayers;
 
   // 1. NASA Blue Marble Base Underlayer
@@ -62,7 +74,26 @@ export function initViewer(container) {
     }
   });
 
-  // 4. NASA City Lights (Earth at Night) - Glowing golden lights on the night side
+  // 4. Google Photorealistic 3D Tiles (Ultra-detailed 3D buildings, bridges, and city geometry)
+  if (GOOGLE_MAPS_API_KEY && typeof Cesium.createGooglePhotorealistic3DTileset === 'function') {
+    try {
+      Cesium.GoogleMaps.defaultApiKey = GOOGLE_MAPS_API_KEY;
+      Cesium.createGooglePhotorealistic3DTileset({ key: GOOGLE_MAPS_API_KEY })
+        .then((tileset) => {
+          viewer.scene.primitives.add(tileset);
+          console.log('[NETRA] Google Photorealistic 3D Tiles active');
+          events.emit('tileset:ready', { type: 'google3d', active: true });
+        })
+        .catch((err) => {
+          console.warn('[NETRA] Google 3D Tiles deferred, active on ESRI sub-meter imagery:', err);
+          events.emit('tileset:ready', { type: 'esri-submeter', active: true });
+        });
+    } catch (err) {
+      console.warn('[NETRA] Google 3D Tiles initialization deferred:', err);
+    }
+  }
+
+  // 5. NASA City Lights (Earth at Night) - Glowing golden lights on the night side
   let lightsLayer = null;
   const lightsProvider = createCityLightsProvider();
   if (lightsProvider) {
@@ -71,7 +102,7 @@ export function initViewer(container) {
     lightsLayer.nightAlpha = 1.0;
   }
 
-  // 5. NOAA-20 VIIRS True-Color Daily Satellite Imagery & Weather Clouds (Calibrated wisps)
+  // 6. NOAA-20 VIIRS True-Color Daily Satellite Imagery & Weather Clouds (Calibrated wisps)
   let noaa20Layer = null;
   const noaa20Provider = createNoaa20Provider();
   if (noaa20Provider) {
@@ -80,7 +111,7 @@ export function initViewer(container) {
     noaa20Layer.nightAlpha = 0.0; // Fade out on night side
   }
 
-  // 6. NASA Geopolitical Borders & Coastlines Overlay
+  // 7. NASA Geopolitical Borders & Coastlines Overlay
   let bordersLayer = null;
   const bordersProvider = createBordersProvider();
   if (bordersProvider) {

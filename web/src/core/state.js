@@ -24,6 +24,7 @@ export const state = {
     aircraft: true,
     quakes: true,
     fires: false,
+    cctv: true,
     nightLights: true,
   },
   mode: 'normal', // 'normal' | 'night-vision' | 'thermal'

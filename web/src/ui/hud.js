@@ -54,6 +54,10 @@ export function initHUD(root) {
         <span class="badge-dot"></span>
         <span>FIRMS</span>
       </div>
+      <div class="feed-badge on" id="badge3DTiles" title="Google Photorealistic 3D Tiles & ESRI Sub-Meter Topography">
+        <span class="badge-dot" style="background:#00F0FF;box-shadow:0 0 6px #00F0FF;"></span>
+        <span id="label3DTiles">GEO 3D</span>
+      </div>
     </div>
     <div class="hud-controls">
       <button class="hud-ctrl-btn" id="btnSurveillanceCam" title="Live Surveillance Feeds & Recon Optics (K)">
@@ -142,6 +146,21 @@ export function initHUD(root) {
   });
 
   // Event subscriptions
+  const badge3DTiles = document.getElementById('badge3DTiles');
+  const label3DTiles = document.getElementById('label3DTiles');
+
+  events.subscribe('tileset:ready', ({ type }) => {
+    if (badge3DTiles && label3DTiles) {
+      if (type === 'google3d') {
+        badge3DTiles.className = 'feed-badge live';
+        label3DTiles.textContent = 'GOOGLE 3D';
+      } else {
+        badge3DTiles.className = 'feed-badge on';
+        label3DTiles.textContent = 'ESRI 3D';
+      }
+    }
+  });
+
   events.subscribe('clock:tick', ({ utcString }) => {
     if (elClock) elClock.textContent = `UTC ${utcString}`;
   });

@@ -27,6 +27,7 @@ import { AircraftLayer } from './layers/aircraft.js';
 import { QuakesLayer } from './layers/quakes.js';
 import { FiresLayer } from './layers/fires.js';
 import { GroundTrackLayer } from './layers/groundTrack.js';
+import { CCTVLayer } from './layers/cctv.js';
 import { GeofenceManager } from './geo/geofence.js';
 import { GestureTracker } from './input/gestures/tracker.js';
 import { GestureHUD } from './ui/gestureHUD.js';
@@ -78,11 +79,12 @@ async function bootstrap() {
   // 5. Start UTC Clock
   clock.start();
 
-  // 6. Initialize Layers (Satellites, Aircraft, Quakes, Fires, Ground Track)
+  // 6. Initialize Layers (Satellites, Aircraft, Quakes, Fires, CCTV, Ground Track)
   const satLayer = new SatellitesLayer(viewer);
   const aircraftLayer = new AircraftLayer(viewer);
   const quakesLayer = new QuakesLayer(viewer);
   const firesLayer = new FiresLayer(viewer);
+  const cctvLayer = new CCTVLayer(viewer);
   const groundTrackLayer = new GroundTrackLayer(viewer);
 
   // Satellite ground track lifecycle
@@ -182,6 +184,7 @@ async function bootstrap() {
     aircraftLayer,
     quakesLayer,
     firesLayer,
+    cctvLayer,
     groundTrackLayer,
     geofenceManager,
     scanMode,
