@@ -7,7 +7,13 @@ import asyncio
 import logging
 from typing import Dict, List, Optional
 import httpx
+from app.config import settings
 from app.models import AircraftItem, HubItem
+from app.upstream.opensky import (
+    fetch_opensky_aircraft,
+    normalize_opensky_state,
+    sample_global_flights,
+)
 
 logger = logging.getLogger("netra.upstream.adsb")
 
@@ -178,79 +184,6 @@ async def fetch_hub_aircraft(
         return []
 
 
-def normalize_opensky_state(state: list) -> Optional[AircraftItem]:
-    """Parse OpenSky state vector into AircraftItem (drops owner and private data per T-API-07)."""
-    if not isinstance(state, (list, tuple)) or len(state) < 11:
-        return None
-
-    hex_code = state[0]
-    callsign = state[1].strip() if state[1] else None
-    lon = state[5]
-    lat = state[6]
-    baro_alt = state[7]
-    on_ground = bool(state[8])
-    velocity = state[9]
-    true_track = state[10]
-    vertical_rate = state[11] if len(state) > 11 else None
-    squawk = str(state[14]).strip() if len(state) > 14 and state[14] else None
-
-    if not hex_code or lat is None or lon is None:
-        return None
-
-    try:
-        lat = float(lat)
-        lon = float(lon)
-        if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
-            return None
-    except (ValueError, TypeError):
-        return None
-
-    alt_ft = int(baro_alt * 3.28084) if baro_alt is not None else 0
-    if alt_ft < 0:
-        alt_ft = 0
-    gs_kt = float(velocity * 1.94384) if velocity is not None else 0.0
-    track_deg = float(true_track) % 360.0 if true_track is not None else 0.0
-    vs_fpm = int(vertical_rate * 196.85) if vertical_rate is not None else 0
-
-    return AircraftItem(
-        hex=str(hex_code).lower().strip(),
-        callsign=callsign,
-        type=None,
-        lat=lat,
-        lon=lon,
-        alt_ft=alt_ft,
-        gs_kt=gs_kt,
-        track_deg=track_deg,
-        vs_fpm=vs_fpm,
-        squawk=squawk,
-        seen_s=0.0,
-        on_ground=on_ground,
-    )
-
-
-def sample_global_flights(items: List[AircraftItem], limit: int = 3000) -> List[AircraftItem]:
-    """Equitably sample global flights across 12 longitude bands so all continents have balanced representation."""
-    airborne = [ac for ac in items if not ac.on_ground]
-    if not airborne:
-        return items[:limit]
-
-    bands: List[List[AircraftItem]] = [[] for _ in range(12)]
-    for ac in airborne:
-        band_idx = int((ac.lon + 180.0) / 30.0) % 12
-        bands[band_idx].append(ac)
-
-    sampled: List[AircraftItem] = []
-    max_len = max([len(b) for b in bands], default=0)
-    for idx in range(max_len):
-        for b in bands:
-            if idx < len(b):
-                sampled.append(b[idx])
-                if len(sampled) >= limit:
-                    return sampled
-
-    return sampled
-
-
 # Module-level memory cache to avoid burst rate limits and prevent 429
 _HUB_CACHE: Dict[str, List[AircraftItem]] = {}
 _MIL_CACHE: List[AircraftItem] = []
@@ -307,6 +240,15 @@ async def fetch_all_flights(client: httpx.AsyncClient) -> List[AircraftItem]:
     cached_lists = list(_HUB_CACHE.values())
     if _MIL_CACHE:
         cached_lists.append(_MIL_CACHE)
+
+    # Fetch live worldwide flights from OpenSky Network OAuth2 gateway
+    if settings.opensky_client_id and settings.opensky_client_secret:
+        try:
+            opensky_items = await fetch_opensky_aircraft(client, limit=2500)
+            if opensky_items:
+                cached_lists.append(opensky_items)
+        except Exception as e:
+            logger.warning(f"OpenSky upstream fetch error: {e}")
 
     merged = merge_hub_results(cached_lists) if cached_lists else []
 

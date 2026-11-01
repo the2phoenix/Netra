@@ -323,3 +323,30 @@ async def test_offline_mode_quakes_and_fires():
             assert data_f["source"] == "fixtures"
     finally:
         settings.offline_mode = False
+
+
+def test_opensky_state_normalizer_and_sampling():
+    """Verify OpenSky vector normalization and continental band sampling."""
+    from app.upstream.opensky import normalize_opensky_state, sample_global_flights
+
+    # Valid OpenSky vector
+    raw_vector = [
+        "a1b2c3", "UAL123 ", "United States", 1730000000, 1730000000,
+        -73.78, 40.64, 10000, False, 250, 180, 5.0, None, 10500, "1200", False, 0
+    ]
+    ac = normalize_opensky_state(raw_vector)
+    assert ac is not None
+    assert ac.hex == "a1b2c3"
+    assert ac.callsign == "UAL123"
+    assert ac.lat == 40.64
+    assert ac.lon == -73.78
+    assert ac.alt_ft > 30000
+    assert ac.on_ground is False
+
+    # Invalid coordinates
+    invalid_vector = ["a1b2c4", "TEST", "None", 0, 0, 999.0, -999.0, 5000, False, 200, 0]
+    assert normalize_opensky_state(invalid_vector) is None
+
+    # Test sampling across longitude bands
+    sampled = sample_global_flights([ac], limit=10)
+    assert len(sampled) == 1
