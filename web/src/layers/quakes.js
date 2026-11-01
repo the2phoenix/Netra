@@ -24,6 +24,7 @@ export class QuakesLayer {
       outlineWidth: 2,
       pixelSize: 22,
       show: false,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
     });
 
     /** @type {Map<string, any>} */
@@ -102,6 +103,7 @@ export class QuakesLayer {
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 1.5,
         id: q.id,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       });
 
       this.quakeMap.set(q.id, { item: q, point });

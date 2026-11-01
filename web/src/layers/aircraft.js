@@ -59,6 +59,7 @@ export class AircraftLayer {
       outlineWidth: 2,
       pixelSize: 24,
       show: false,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
     });
 
     // Trail polyline for selected aircraft
@@ -236,11 +237,12 @@ export class AircraftLayer {
         const billboard = this.collection.add({
           position: pos,
           image: this.spriteCanvas,
-          scale: 1.15,
-          scaleByDistance: new Cesium.NearFarScalar(3.0e5, 1.4, 1.5e7, 0.55),
+          scale: 1.25,
+          scaleByDistance: new Cesium.NearFarScalar(1.0e4, 1.8, 3.5e7, 0.9),
           color: color,
           rotation: Cesium.Math.toRadians(item.track_deg),
           id: hex,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         });
 
         // 15-minute forward projected flight route vector (spherical geodesic arc)

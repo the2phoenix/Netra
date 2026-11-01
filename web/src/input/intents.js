@@ -7,6 +7,7 @@ import { events } from '../core/events.js';
 export const INTENT_TYPES = {
   ROTATE: 'ROTATE',
   ZOOM: 'ZOOM',
+  TILT: 'TILT',
   FLY_TO: 'FLY_TO',
   NEXT_MODE: 'NEXT_MODE',
 };

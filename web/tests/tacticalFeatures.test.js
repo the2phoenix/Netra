@@ -85,7 +85,7 @@ describe("Tactical Command Center Features & Flight Engine", () => {
       expect(node.lat).toBeLessThanOrEqual(90);
       expect(node.lon).toBeGreaterThanOrEqual(-180);
       expect(node.lon).toBeLessThanOrEqual(180);
-      expect(['live', 'recon']).toContain(node.feedType);
+      expect(['traffic-cam', 'recon', 'live']).toContain(node.feedType);
     });
   });
 
@@ -107,6 +107,25 @@ describe("Tactical Command Center Features & Flight Engine", () => {
 
     vm.setMode('normal');
     expect(fakeViewer.canvas.style.filter).toBe('none');
+  });
+
+  it('T-GEV-07: Tactical landmarks list contains key 3D monuments with valid elevations', async () => {
+    const { TACTICAL_LANDMARKS } = await import('../src/ui/quickSearch.js');
+    expect(TACTICAL_LANDMARKS.length).toBeGreaterThanOrEqual(10);
+
+    const names = TACTICAL_LANDMARKS.map((l) => l.name.toLowerCase());
+    expect(names.some((n) => n.includes('statue of liberty'))).toBe(true);
+    expect(names.some((n) => n.includes('tokyo tower'))).toBe(true);
+    expect(names.some((n) => n.includes('india gate'))).toBe(true);
+  });
+
+  it('T-GEV-08: Centralized API config defines keys and endpoints for intelligence feeds', async () => {
+    const { API_CONFIG } = await import('../src/config/apiConfig.js');
+    expect(API_CONFIG.google3d).toBeDefined();
+    expect(API_CONFIG.google3d.key).toBeDefined();
+    expect(API_CONFIG.mapbox).toBeDefined();
+    expect(API_CONFIG.trafficCams).toBeDefined();
+    expect(API_CONFIG.osm).toBeDefined();
   });
 });
 

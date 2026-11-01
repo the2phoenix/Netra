@@ -9,21 +9,21 @@ export const CHANNELS = [
     location: 'GEO-ORBITAL // ACTIVE OVERHEAD INTERCEPT',
     feedType: 'recon',
     target: 'GROUND SURVEILLANCE SWATH',
-    streamUrl: '',
+    imageUrl: '',
   },
-  ...GLOBAL_CCTV_NODES.map((node, idx) => ({
+  ...GLOBAL_CCTV_NODES.map((node) => ({
     id: node.id,
     name: node.name,
     location: `${node.city} [${node.lat.toFixed(4)}° N, ${node.lon.toFixed(4)}° E]`,
     feedType: node.feedType,
     target: node.description,
-    streamUrl: node.streamUrl,
+    imageUrl: node.imageUrl,
   })),
 ];
 
 /**
  * Tactical Surveillance Camera Feed PIP (Bottom-Left)
- * Provides classified overhead satellite optical feeds and city surveillance nodes.
+ * Provides classified overhead satellite optical feeds and live city CCTV nodes.
  *
  * @param {HTMLElement} root
  */
@@ -47,7 +47,7 @@ export function initSurveillanceCamera(root) {
     </div>
 
     <div class="cam-viewport" id="camViewport">
-      <iframe class="cam-live-iframe" id="camIframe" allow="autoplay; encrypted-media" title="Live Surveillance Feed"></iframe>
+      <img class="cam-live-img" id="camLiveImg" alt="Live CCTV Surveillance Feed" />
       <canvas class="cam-optical-canvas" id="camCanvas" width="360" height="200"></canvas>
       <div class="cam-scanlines"></div>
       <div class="cam-crosshair"></div>
@@ -77,6 +77,7 @@ export function initSurveillanceCamera(root) {
   let zoomLevel = 2;
   let currentFilter = 'EO'; // EO, IR, NVG
   let isPanelOpen = false;
+  let refreshTimer = null;
 
   const titleEl = container.querySelector('#camChannelTitle');
   const locEl = container.querySelector('#camLocation');
@@ -85,7 +86,7 @@ export function initSurveillanceCamera(root) {
   const statusBadgeEl = container.querySelector('#camStatusBadge');
   const filterBtn = container.querySelector('#camFilterToggle');
   const canvas = /** @type {HTMLCanvasElement} */ (container.querySelector('#camCanvas'));
-  const iframe = /** @type {HTMLIFrameElement} */ (container.querySelector('#camIframe'));
+  const liveImg = /** @type {HTMLImageElement} */ (container.querySelector('#camLiveImg'));
   const ctx = canvas.getContext('2d');
 
   function openCam() {
@@ -97,7 +98,10 @@ export function initSurveillanceCamera(root) {
   function closeCam() {
     container.style.display = 'none';
     isPanelOpen = false;
-    if (iframe) iframe.src = 'about:blank';
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
   }
 
   function toggleCam() {
@@ -113,29 +117,47 @@ export function initSurveillanceCamera(root) {
     if (locEl) locEl.textContent = ch.location;
     if (zoomIndEl) zoomIndEl.textContent = `OPTICAL ${zoomLevel}X`;
 
-    if (ch.feedType === 'live' && ch.streamUrl) {
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+
+    if (ch.feedType === 'traffic-cam' && ch.imageUrl) {
       if (canvas) canvas.style.display = 'none';
-      if (iframe) {
-        iframe.style.display = 'block';
-        if (iframe.src !== ch.streamUrl) {
-          iframe.src = ch.streamUrl;
-        }
+      if (liveImg) {
+        liveImg.style.display = 'block';
+        liveImg.src = `${ch.imageUrl}?t=${Date.now()}`;
+        // Auto-refresh traffic camera snapshot every 2.5s
+        refreshTimer = setInterval(() => {
+          if (isPanelOpen && liveImg.style.display !== 'none') {
+            liveImg.src = `${ch.imageUrl}?t=${Date.now()}`;
+          }
+        }, 2500);
       }
       if (statusBadgeEl) {
         statusBadgeEl.textContent = 'SIGINT: LIVE CCTV STREAM // REC';
         statusBadgeEl.style.color = '#10B981';
       }
     } else {
-      if (iframe) {
-        iframe.style.display = 'none';
-        iframe.src = 'about:blank';
-      }
+      if (liveImg) liveImg.style.display = 'none';
       if (canvas) canvas.style.display = 'block';
       if (statusBadgeEl) {
         statusBadgeEl.textContent = 'SIGINT: OVERHEAD RECON // REC';
         statusBadgeEl.style.color = '#38BDF8';
       }
     }
+  }
+
+  if (liveImg) {
+    liveImg.onerror = () => {
+      // If live public stream is temporarily unreachable, cleanly fall back to high-res optical sensor
+      liveImg.style.display = 'none';
+      if (canvas) canvas.style.display = 'block';
+      if (statusBadgeEl) {
+        statusBadgeEl.textContent = 'SIGINT: OPTICAL RECON // REC';
+        statusBadgeEl.style.color = '#F59E0B';
+      }
+    };
   }
 
   container.querySelector('#camCloseBtn')?.addEventListener('click', closeCam);
@@ -166,14 +188,14 @@ export function initSurveillanceCamera(root) {
       else currentFilter = 'EO';
       filterBtn.textContent = `FILTER: ${currentFilter}`;
 
-      // Apply optical filter to iframe as well
-      if (iframe) {
+      // Apply optical filter to live image
+      if (liveImg) {
         if (currentFilter === 'IR') {
-          iframe.style.filter = 'invert(1) hue-rotate(180deg) contrast(1.5)';
+          liveImg.style.filter = 'invert(1) hue-rotate(180deg) contrast(1.5)';
         } else if (currentFilter === 'NVG') {
-          iframe.style.filter = 'brightness(1.2) contrast(1.4) hue-rotate(85deg) saturate(3)';
+          liveImg.style.filter = 'brightness(1.2) contrast(1.4) hue-rotate(85deg) saturate(3)';
         } else {
-          iframe.style.filter = 'none';
+          liveImg.style.filter = 'none';
         }
       }
     });

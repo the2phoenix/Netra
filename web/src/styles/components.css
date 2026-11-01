@@ -1636,12 +1636,14 @@
   overflow: hidden;
 }
 
-.cam-live-iframe {
+.cam-live-iframe,
+.cam-live-img {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  object-fit: cover;
   border: none;
   display: none;
   z-index: 1;

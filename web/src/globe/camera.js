@@ -5,6 +5,7 @@ import { state } from '../core/state.js';
 
 /**
  * Connects abstract intents to Cesium camera movements.
+ * Supports smooth 3D globe orbit, dynamic auto-pitch into 3D on zoom-in, and interactive 3D tilt.
  *
  * @param {Cesium.Viewer} viewer
  */
@@ -12,52 +13,85 @@ export function setupCameraControls(viewer) {
   const camera = viewer.camera;
   const scene = viewer.scene;
 
-  // Lock camera orientation so North is always upright
+  // Lock camera roll so North remains upright during pan
   camera.constrainedAxis = Cesium.Cartesian3.UNIT_Z;
 
-  // Handle ROTATE intent
+  // Handle ROTATE intent (Left mouse drag)
   events.subscribe('intent:ROTATE', ({ dx, dy }) => {
     const height = camera.positionCartographic.height;
     // Scale sensitivity dynamically: responsive at orbit, precise when zoomed in
-    const factor = Math.max(0.001, Math.min(0.004, (height / 15000000) * 0.0035));
+    const factor = Math.max(0.0008, Math.min(0.004, (height / 15000000) * 0.0035));
 
-    // 1. Horizontal rotation (longitude orbit around Earth's Z axis)
     camera.rotateRight(-dx * factor);
 
-    // 2. Vertical rotation (latitude orbit)
-    // In Cesium rotateUp:
-    // deltaAngle > 0 moves camera SOUTH (towards -90°)
-    // deltaAngle < 0 moves camera NORTH (towards +90°)
     const deltaAngle = -dy * factor;
     const currentLat = camera.positionCartographic.latitude;
-    const maxLatRad = Cesium.Math.toRadians(82); // Clamp to +/- 82 degrees to prevent polar gimbal lock
+    const maxLatRad = Cesium.Math.toRadians(82);
 
-    // Prevent pushing past the pole limits, but ALWAYS allow pulling back towards the equator
-    if (deltaAngle > 0 && currentLat <= -maxLatRad) {
-      return;
-    }
-    if (deltaAngle < 0 && currentLat >= maxLatRad) {
-      return;
-    }
+    if (deltaAngle > 0 && currentLat <= -maxLatRad) return;
+    if (deltaAngle < 0 && currentLat >= maxLatRad) return;
 
     camera.rotateUp(deltaAngle);
   });
 
-  // Handle ZOOM intent
+  // Handle TILT intent (Right mouse drag / Middle mouse drag)
+  events.subscribe('intent:TILT', ({ dx, dy }) => {
+    const sensitivity = 0.0045;
+    // 1. Tilt pitch up/down
+    const currentPitch = camera.pitch;
+    const targetPitch = Cesium.Math.clamp(
+      currentPitch + dy * sensitivity,
+      Cesium.Math.toRadians(-88), // near nadir
+      Cesium.Math.toRadians(-12)  // near horizon
+    );
+
+    // 2. Rotate heading left/right
+    const currentHeading = camera.heading;
+    const targetHeading = currentHeading + dx * sensitivity;
+
+    camera.setView({
+      orientation: {
+        heading: targetHeading,
+        pitch: targetPitch,
+        roll: 0.0,
+      },
+    });
+  });
+
+  // Handle ZOOM intent (Scroll wheel)
   events.subscribe('intent:ZOOM', ({ dz }) => {
     const height = camera.positionCartographic.height;
-    const amount = dz * (height / 2000);
+    const amount = dz * (height / 1800);
+
     if (dz > 0) {
       camera.zoomOut(Math.abs(amount));
+      // As user zooms out into space, smoothly return towards nadir (-90°)
+      if (height > 150000 && camera.pitch > Cesium.Math.toRadians(-85)) {
+        const newPitch = Cesium.Math.clamp(
+          camera.pitch - Cesium.Math.toRadians(2.0),
+          Cesium.Math.toRadians(-90),
+          Cesium.Math.toRadians(-35)
+        );
+        camera.setView({ orientation: { heading: camera.heading, pitch: newPitch, roll: 0.0 } });
+      }
     } else {
-      // Prevent zooming inside the Earth
-      if (height > 10000) {
+      // Allow zooming close to ground (down to 150m)
+      if (height > 150) {
         camera.zoomIn(Math.abs(amount));
+        // Natural 3D Earth auto-tilt: as user zooms below 120km, dynamically pitch towards 3D oblique perspective (-38°)
+        if (height < 120000 && camera.pitch < Cesium.Math.toRadians(-40)) {
+          const newPitch = Cesium.Math.clamp(
+            camera.pitch + Cesium.Math.toRadians(2.5),
+            Cesium.Math.toRadians(-90),
+            Cesium.Math.toRadians(-38)
+          );
+          camera.setView({ orientation: { heading: camera.heading, pitch: newPitch, roll: 0.0 } });
+        }
       }
     }
   });
 
-  // Handle FLY_TO intent
+  // Handle FLY_TO intent (Double click)
   events.subscribe('intent:FLY_TO', ({ clientX, clientY }) => {
     const cartesian = viewer.camera.pickEllipsoid(
       new Cesium.Cartesian2(clientX, clientY),
@@ -65,13 +99,18 @@ export function setupCameraControls(viewer) {
     );
     if (cartesian) {
       const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
-      const targetHeight = Math.max(1000000, camera.positionCartographic.height * 0.5);
+      const targetHeight = Math.max(1200, camera.positionCartographic.height * 0.4);
       camera.flyTo({
         destination: Cesium.Cartesian3.fromRadians(
           cartographic.longitude,
           cartographic.latitude,
           targetHeight
         ),
+        orientation: {
+          heading: camera.heading,
+          pitch: Cesium.Math.toRadians(targetHeight < 50000 ? -38.0 : -90.0),
+          roll: 0.0,
+        },
         duration: 1.5,
       });
     }
@@ -155,23 +194,22 @@ export function setupCameraControls(viewer) {
 
   events.subscribe('camera:toggleTilt', toggleTilt);
 
-  // Jump to location (city or coordinates)
-  events.subscribe('camera:jumpTo', ({ lat, lon, heightM = 500000 }) => {
+  // Jump to location (monument, landmark, city or coordinates in 3D)
+  events.subscribe('camera:jumpTo', ({ lat, lon, heightM = 500000, pitchDeg = -35.0, headingDeg = 0.0 }) => {
     clearCockpitChase();
     camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat, heightM),
       orientation: {
-        heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(isOblique ? -35.0 : -90.0),
+        heading: Cesium.Math.toRadians(headingDeg),
+        pitch: Cesium.Math.toRadians(heightM < 100000 ? pitchDeg : -90.0),
         roll: 0.0,
       },
-      duration: 1.6,
+      duration: 1.8,
     });
   });
 
   // Keyboard shortcut listener: C for Cockpit, T for Tilt, Esc to reset
   window.addEventListener('keydown', (e) => {
-    // Ignore if typing inside input / search bar
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return;
 
     if (e.key === 'c' || e.key === 'C') {

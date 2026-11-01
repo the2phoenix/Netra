@@ -4,80 +4,91 @@ import { events } from '../core/events.js';
 
 export const GLOBAL_CCTV_NODES = [
   {
-    id: 'cctv-tokyo',
-    name: 'CH 02 // TOKYO // SHIBUYA CROSSING',
-    city: 'TOKYO, JAPAN',
-    lat: 35.6595,
-    lon: 139.7005,
-    alt: 250,
-    feedType: 'live',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/w_HXaW4iTj8?autoplay=1&mute=1&controls=0&modestbranding=1',
-    description: 'Hachiko Pedestrian Scramble Intersection Recon',
-  },
-  {
-    id: 'cctv-nyc',
-    name: 'CH 03 // NEW YORK // TIMES SQUARE HUB',
+    id: 'cctv-nyc-times-sq',
+    name: 'CH 02 // NEW YORK // TIMES SQUARE HUB',
     city: 'NEW YORK, USA',
     lat: 40.7580,
     lon: -73.9855,
     alt: 280,
-    feedType: 'live',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/1-iS7LArMPA?autoplay=1&mute=1&controls=0&modestbranding=1',
-    description: 'Broadway & 7th Avenue Midtown Surveillance Corridor',
+    feedType: 'traffic-cam',
+    imageUrl: 'https://webcams.nyctmc.org/api/cameras/d15e98bb-a0d0-40e9-9133-90d2e2b8eaef/image',
+    description: 'Broadway & 7th Ave NYC DOT Live Surveillance Corridor',
+  },
+  {
+    id: 'cctv-nyc-5th-ave',
+    name: 'CH 03 // NEW YORK // 5TH AVENUE RECON',
+    city: 'NEW YORK, USA',
+    lat: 40.7516,
+    lon: -73.9822,
+    alt: 250,
+    feedType: 'traffic-cam',
+    imageUrl: 'https://webcams.nyctmc.org/api/cameras/1167664c-b169-42b7-83cf-eb8c89c7438d/image',
+    description: 'Midtown Manhattan 5th Ave & 42nd St Tactical Intersection',
+  },
+  {
+    id: 'cctv-nyc-fdr',
+    name: 'CH 04 // NEW YORK // BROOKLYN BRIDGE FDR',
+    city: 'NEW YORK, USA',
+    lat: 40.7061,
+    lon: -73.9969,
+    alt: 220,
+    feedType: 'traffic-cam',
+    imageUrl: 'https://webcams.nyctmc.org/api/cameras/cf3c3c39-2b02-4ec4-9dfc-1f48652d2f70/image',
+    description: 'FDR Drive & Brooklyn Bridge Maritime Airway Corridor',
+  },
+  {
+    id: 'cctv-tokyo',
+    name: 'CH 05 // TOKYO // SHIBUYA METROPOLITAN',
+    city: 'TOKYO, JAPAN',
+    lat: 35.6595,
+    lon: 139.7005,
+    alt: 250,
+    feedType: 'recon',
+    imageUrl: '',
+    description: 'Hachiko Pedestrian Scramble Intersection EO/IR Swath',
   },
   {
     id: 'cctv-london',
-    name: 'CH 04 // LONDON // WESTMINSTER PALACE',
+    name: 'CH 06 // LONDON // WESTMINSTER PALACE',
     city: 'LONDON, UK',
     lat: 51.5007,
     lon: -0.1246,
     alt: 180,
-    feedType: 'live',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/79_c9m7_1B4?autoplay=1&mute=1&controls=0&modestbranding=1',
-    description: 'River Thames & Westminster Abbey Airway',
-  },
-  {
-    id: 'cctv-venice',
-    name: 'CH 05 // VENICE // GRAND CANAL',
-    city: 'VENICE, ITALY',
-    lat: 45.4381,
-    lon: 12.3358,
-    alt: 150,
-    feedType: 'live',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/ph1vpnYgxJk?autoplay=1&mute=1&controls=0&modestbranding=1',
-    description: 'Rialto Maritime Basin & Waterway Intercept',
+    feedType: 'recon',
+    imageUrl: '',
+    description: 'River Thames & Westminster Abbey Airway Intercept',
   },
   {
     id: 'cctv-mumbai',
-    name: 'CH 06 // MUMBAI // GATEWAY HARBOR',
+    name: 'CH 07 // MUMBAI // GATEWAY HARBOR',
     city: 'MUMBAI, INDIA',
     lat: 18.9220,
     lon: 72.8347,
     alt: 120,
     feedType: 'recon',
-    streamUrl: '',
+    imageUrl: '',
     description: 'Colaba Arabian Sea Coastal Port Surveillance',
   },
   {
     id: 'cctv-paris',
-    name: 'CH 07 // PARIS // EIFFEL TOWER',
+    name: 'CH 08 // PARIS // EIFFEL TOWER',
     city: 'PARIS, FRANCE',
     lat: 48.8584,
     lon: 2.2945,
     alt: 320,
-    feedType: 'live',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/OzYpT3q6HdA?autoplay=1&mute=1&controls=0&modestbranding=1',
-    description: 'Champ de Mars Aerospace Corridor',
+    feedType: 'recon',
+    imageUrl: '',
+    description: 'Champ de Mars Aerospace & Metropolitan Corridor',
   },
   {
     id: 'cctv-dubai',
-    name: 'CH 08 // DUBAI // DOWNTOWN TOWER',
+    name: 'CH 09 // DUBAI // BURJ KHALIFA',
     city: 'DUBAI, UAE',
     lat: 25.1972,
     lon: 55.2744,
     alt: 500,
     feedType: 'recon',
-    streamUrl: '',
+    imageUrl: '',
     description: 'Burj Khalifa Metropolitan Observation Swath',
   },
 ];
@@ -113,7 +124,7 @@ export class CCTVLayer {
   createMarkers() {
     const iconSvg = `data:image/svg+xml;utf8,${encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
-        <circle cx="18" cy="18" r="16" fill="rgba(6, 182, 212, 0.25)" stroke="#00F0FF" stroke-width="2"/>
+        <circle cx="18" cy="18" r="16" fill="rgba(6, 182, 212, 0.35)" stroke="#00F0FF" stroke-width="2"/>
         <circle cx="18" cy="18" r="6" fill="#00F0FF"/>
         <path d="M18 4 L18 10 M18 26 L18 32 M4 18 L10 18 M26 18 L32 18" stroke="#00F0FF" stroke-width="2"/>
       </svg>
@@ -125,11 +136,10 @@ export class CCTVLayer {
       const billboard = this.collection.add({
         position: pos,
         image: iconSvg,
-        width: 28,
-        height: 28,
+        width: 30,
+        height: 30,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       });
 
@@ -170,12 +180,12 @@ export class CCTVLayer {
     // Open surveillance feed and switch channel
     events.emit('cctv:selected', camera);
 
-    // Smoothly fly camera to city
+    // Smoothly fly camera to city with a 3D oblique angle
     this.viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(camera.lon, camera.lat, 4500.0),
+      destination: Cesium.Cartesian3.fromDegrees(camera.lon, camera.lat, 3500.0),
       orientation: {
         heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-45),
+        pitch: Cesium.Math.toRadians(-35), // 3D oblique angle
         roll: 0,
       },
       duration: 2.2,

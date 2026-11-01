@@ -92,6 +92,7 @@ export class FiresLayer {
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 1,
         id: key,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       });
 
       this.fireMap.set(key, { item: f, point });

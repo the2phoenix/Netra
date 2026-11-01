@@ -10,12 +10,10 @@ import {
 } from './imagery.js';
 import { setupCameraControls } from './camera.js';
 import { events } from '../core/events.js';
+import { API_CONFIG } from '../config/apiConfig.js';
 
 // User's Google Maps Photorealistic 3D Tiles API Key ($200/mo recurring credit tier)
-const GOOGLE_MAPS_API_KEY =
-  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_KEY) ||
-  (typeof localStorage !== 'undefined' && localStorage.getItem('NETRA_GOOGLE_MAPS_KEY')) ||
-  'AIzaSyAZu8mjUqiOqEaeNWVILfp2Tyd1vLkcexQ';
+const GOOGLE_MAPS_API_KEY = API_CONFIG.google3d.key;
 
 /**
  * Initializes the customized Cesium 3D Globe Viewer.
@@ -134,6 +132,7 @@ export function initViewer(container) {
   globe.enableLighting = true;
   globe.dynamicAtmosphereLighting = true;
   globe.dynamicAtmosphereLightingFromSun = true;
+  globe.depthTestAgainstTerrain = true; // Enables true 3D relief for mountains & buildings
 
   // Night-side ambient twilight color (deep ocean blue, never pitch black)
   globe.ambientLightColor = new Cesium.Color(0.28, 0.32, 0.40, 1.0);

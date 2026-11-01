@@ -24,6 +24,7 @@ export class SatellitesLayer {
       outlineWidth: 2,
       pixelSize: 14,
       show: false,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
     });
 
     /** @type {Map<number, Cesium.PointPrimitive>} */
@@ -144,6 +145,7 @@ export class SatellitesLayer {
         outlineWidth: 1,
         id: item.norad_cat_id,
         show: this.groupVisibility[grp] !== false,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       });
 
       this.pointMap.set(item.norad_cat_id, point);
