@@ -1490,3 +1490,258 @@
   50% { opacity: 0.4; }
 }
 
+/* Tactical Screen-Space Target Lock Brackets */
+.tactical-target-bracket {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 85;
+}
+
+.bracket-tl,
+.bracket-tr,
+.bracket-bl,
+.bracket-br {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: #38BDF8;
+  border-style: solid;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+}
+
+.bracket-tl {
+  top: 0;
+  left: 0;
+  border-width: 2px 0 0 2px;
+}
+
+.bracket-tr {
+  top: 0;
+  right: 0;
+  border-width: 2px 2px 0 0;
+}
+
+.bracket-bl {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 2px 2px;
+}
+
+.bracket-br {
+  bottom: 0;
+  right: 0;
+  border-width: 0 2px 2px 0;
+}
+
+.bracket-telemetry {
+  position: absolute;
+  left: 64px;
+  top: -4px;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(8, 14, 26, 0.85);
+  padding: 3px 6px;
+  border-left: 2px solid #38BDF8;
+  border-radius: 2px;
+  backdrop-filter: blur(4px);
+}
+
+.bracket-id {
+  font-size: 10px;
+  font-weight: bold;
+  color: #38BDF8;
+  letter-spacing: 0.5px;
+}
+
+.bracket-stats {
+  font-size: 9px;
+  color: var(--text-mid);
+}
+
+/* Tactical Surveillance Camera Panel */
+.surveillance-cam-panel {
+  position: fixed;
+  bottom: 40px;
+  left: 20px;
+  width: 360px;
+  background: rgba(10, 16, 26, 0.96);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
+  border-radius: 6px;
+  overflow: hidden;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.cam-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid var(--line);
+}
+
+.cam-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #38BDF8;
+  font-weight: bold;
+}
+
+.cam-rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #EF4444;
+  box-shadow: 0 0 6px #EF4444;
+  animation: recBlink 1s infinite;
+}
+
+@keyframes recBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.cam-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.cam-btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-lo);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.cam-btn-icon:hover {
+  color: var(--text-hi);
+}
+
+.cam-viewport {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  background: #000;
+  overflow: hidden;
+}
+
+.cam-optical-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cam-scanlines {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.cam-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.cam-osd-top {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.cam-osd-bottom {
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.cam-status-pill {
+  color: #38BDF8;
+  font-weight: bold;
+}
+
+.cam-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.8);
+  border-top: 1px solid var(--line);
+}
+
+.cam-zoom-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.cam-zoom-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
+  color: var(--text-lo);
+  padding: 2px 6px;
+  font-size: 10px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.cam-zoom-btn.active,
+.cam-zoom-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38BDF8;
+  border-color: #38BDF8;
+}
+
+.cam-filter-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
+  color: var(--text-mid);
+  padding: 2px 8px;
+  font-size: 10px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.cam-filter-btn:hover {
+  color: var(--text-hi);
+  border-color: var(--text-hi);
+}
+
+

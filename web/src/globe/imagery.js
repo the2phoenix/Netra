@@ -2,6 +2,44 @@
 import * as Cesium from 'cesium';
 
 /**
+ * 0. High-Resolution Sub-Meter Satellite Imagery (ESRI World Imagery)
+ * Global satellite coverage down to Zoom Level 19 (<0.5m per pixel).
+ *
+ * @returns {Promise<Cesium.ImageryProvider>}
+ */
+export async function createEsriWorldImageryProvider() {
+  try {
+    return await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+      'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer',
+      {
+        enablePickFeatures: false,
+        credit: new Cesium.Credit('Esri, Maxar, Earthstar Geographics, CNES/Airbus DS'),
+      }
+    );
+  } catch (err) {
+    console.warn('ESRI World Imagery unavailable, falling back to Blue Marble:', err);
+    return createBlueMarbleProvider();
+  }
+}
+
+/**
+ * Real-time 3D Mountain & Elevation Terrain
+ * Physical topography for Himalayas, Alps, Rockies, and coastal elevations.
+ *
+ * @returns {Promise<Cesium.TerrainProvider|null>}
+ */
+export async function createWorldTerrainProvider() {
+  try {
+    return await Cesium.ArcGISTiledElevationTerrainProvider.fromUrl(
+      'https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer'
+    );
+  } catch (err) {
+    console.warn('3D Terrain unavailable, defaulting to smooth ellipsoid:', err);
+    return null;
+  }
+}
+
+/**
  * 1. NASA GIBS Blue Marble Base Layer
  * Seamless 100% full-globe coverage with topography and deep bathymetry.
  *

@@ -56,6 +56,9 @@ export function initHUD(root) {
       </div>
     </div>
     <div class="hud-controls">
+      <button class="hud-ctrl-btn" id="btnSurveillanceCam" title="Live Surveillance Feeds & Recon Optics (K)">
+        <span>📹</span> CAMS [K]
+      </button>
       <button class="hud-ctrl-btn" id="btnQuickSearch" title="Quick Search City or Coordinates (/)">
         <span>🔍</span> SEARCH [/]
       </button>
@@ -113,10 +116,14 @@ export function initHUD(root) {
   const badgeAdsb = document.getElementById('badgeAdsb');
   const badgeUsgs = document.getElementById('badgeUsgs');
   const badgeFirms = document.getElementById('badgeFirms');
+  const btnCam = document.getElementById('btnSurveillanceCam');
   const btnSearch = document.getElementById('btnQuickSearch');
   const btnTilt = document.getElementById('btnHorizonTilt');
   const btnAbout = document.getElementById('btnAboutModal');
 
+  if (btnCam) {
+    btnCam.addEventListener('click', () => events.emit('surveillance:toggle', null));
+  }
   if (btnSearch) {
     btnSearch.addEventListener('click', () => events.emit('quicksearch:open', null));
   }

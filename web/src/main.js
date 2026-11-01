@@ -34,6 +34,8 @@ import { VisualModesManager } from './globe/visualModes.js';
 import { initQuickSearch } from './ui/quickSearch.js';
 import { initAboutModal } from './ui/aboutModal.js';
 import { runBootSequence } from './ui/bootSequence.js';
+import { initTargetReticle } from './ui/targetReticle.js';
+import { initSurveillanceCamera } from './ui/surveillanceCam.js';
 
 async function bootstrap() {
   const container = document.getElementById('cesiumContainer');
@@ -54,6 +56,8 @@ async function bootstrap() {
   initHUD(appRoot);
   initQuickSearch(appRoot);
   initAboutModal(appRoot);
+  initTargetReticle(appRoot, viewer);
+  initSurveillanceCamera(appRoot);
   const layerPanel = new LayerPanel(appRoot);
   const dossierPanel = new DossierPanel(appRoot);
   const eventFeed = new EventFeed(appRoot);
