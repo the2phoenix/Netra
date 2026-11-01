@@ -35,12 +35,10 @@ export function initAboutModal(root) {
         </div>
 
         <div class="about-section">
-          <h3>INSPIRATION & PROVENANCE</h3>
+          <h3>TACTICAL SENSOR PIPELINE</h3>
           <p>
-            UI architecture and tactical cockpit tracking inspired by
-            <a href="https://github.com/bilawalsidhu/gods-eye-view" target="_blank" rel="noopener">
-              <strong>God's Eye View</strong> by Bilawal Sidhu
-            </a>.
+            Real-time multi-source data fusion engine incorporating commercial and military ADS-B transponder telemetry,
+            SGP4 satellite orbital propagation, and real-time seismic hazard detection.
           </p>
         </div>
 
@@ -104,3 +102,4 @@ export function initAboutModal(root) {
 
   events.subscribe('about:open', openModal);
 }
+

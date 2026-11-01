@@ -16,7 +16,7 @@ const CITY_PRESETS = [
 
 /**
  * Keyless Quick Search & City Jump Bar (Hotkey: /)
- * Inspired by God's Eye View keyless search & coordinate routing.
+ * Tactical coordinate and city navigation system.
  *
  * @param {HTMLElement} root
  */
@@ -155,3 +155,4 @@ export function initQuickSearch(root) {
 
   events.subscribe('quicksearch:open', openSearch);
 }
+

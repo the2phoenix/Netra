@@ -260,7 +260,7 @@ def load_aircraft_fixtures() -> List[AircraftItem]:
                 )
             )
 
-    # Add realistic tactical military patrols (God's Eye View inspiration)
+    # Add realistic tactical military patrols
     mil_patrols = [
         ("FORTE11", "RQ4", 34.80, 32.50, 52000, 340.0, 95.0, "0321"),   # Eastern Med RQ-4 Global Hawk
         ("JAKE21", "RC135", 55.40, 20.80, 36000, 420.0, 260.0, "1452"),  # Baltic Sea RC-135 Rivet Joint

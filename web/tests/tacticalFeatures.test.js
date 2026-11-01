@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import * as Cesium from 'cesium';
 
-describe("God's Eye View Features & Flight Enhancements", () => {
+describe("Tactical Command Center Features & Flight Engine", () => {
   it('T-GEV-01: Coordinate regex correctly parses valid lat/lon strings', () => {
     const parseCoord = (str) => {
       const match = str.trim().toLowerCase().match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/);
@@ -73,3 +73,4 @@ describe("God's Eye View Features & Flight Enhancements", () => {
     expect(hpr.range).toBe(150.0);
   });
 });
+
