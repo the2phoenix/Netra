@@ -40,6 +40,9 @@ export class DossierPanel {
           <button class="dossier-action-btn secondary" id="btnDossierTrack" style="display:none">
             TRACK
           </button>
+          <button class="dossier-action-btn secondary" id="btnDossierCockpit" style="display:none">
+            ✈ COCKPIT [C]
+          </button>
           <button class="dossier-action-btn secondary" id="btnDossierClear">
             CLEAR
           </button>
@@ -103,6 +106,7 @@ export class DossierPanel {
     const btnClear = this.element.querySelector('#btnDossierClear');
     const btnFlyTo = this.element.querySelector('#btnDossierFlyTo');
     const btnTrack = this.element.querySelector('#btnDossierTrack');
+    const btnCockpit = this.element.querySelector('#btnDossierCockpit');
 
     if (btnClose) btnClose.addEventListener('click', () => this.handleClear());
     if (btnClear) btnClear.addEventListener('click', () => this.handleClear());
@@ -114,6 +118,21 @@ export class DossierPanel {
         }
       });
     }
+    if (btnCockpit) {
+      btnCockpit.addEventListener('click', () => {
+        events.emit('intent:TOGGLE_COCKPIT', null);
+      });
+    }
+
+    events.subscribe('cockpit:state', ({ active }) => {
+      if (btnCockpit) {
+        btnCockpit.textContent = active ? '✕ EXIT CHASE [C]' : '✈ COCKPIT [C]';
+        btnCockpit.className = active ? 'dossier-action-btn primary' : 'dossier-action-btn secondary';
+      }
+    });
+
+    // Cache for flight routes
+    this.routeCache = new Map();
 
     // Keyboard shortcut Escape
     window.addEventListener('keydown', (e) => {
@@ -185,10 +204,19 @@ export class DossierPanel {
     this.currentId = ac.hex;
 
     const isEmergency = ['7700', '7600', '7500'].includes(ac.squawk);
+    const isMil = Boolean(ac.is_military);
 
     if (this.elBadge) {
-      this.elBadge.className = isEmergency ? 'dossier-badge alert' : 'dossier-badge air';
-      this.elBadge.textContent = isEmergency ? 'EMERGENCY' : 'AIRCRAFT';
+      if (isEmergency) {
+        this.elBadge.className = 'dossier-badge alert';
+        this.elBadge.textContent = 'EMERGENCY';
+      } else if (isMil) {
+        this.elBadge.className = 'dossier-badge mil';
+        this.elBadge.textContent = 'MILITARY';
+      } else {
+        this.elBadge.className = 'dossier-badge air';
+        this.elBadge.textContent = 'AIRCRAFT';
+      }
     }
     if (this.elSubId) this.elSubId.textContent = `ICAO ${ac.hex.toUpperCase()}`;
     if (this.elName) this.elName.textContent = `${ac.callsign || 'UNKNOWN'}  ${ac.type || ''}`;
@@ -197,8 +225,44 @@ export class DossierPanel {
       ? `<span class="val alert">${ac.squawk} [EMERGENCY]</span>`
       : `<span class="val">${ac.squawk || '----'}</span>`;
 
+    // Fetch and display route enrichment
+    let routeHtml = '';
+    const cachedRoute = ac.callsign ? this.routeCache.get(ac.callsign) : null;
+    if (cachedRoute) {
+      routeHtml = `
+        <div class="dossier-row route-row" style="background: rgba(56, 189, 248, 0.12); padding: 4px 6px; border-radius: 4px;">
+          <span class="lbl" style="color:#38BDF8; font-weight:bold;">ROUTE</span>
+          <span class="val highlight" style="color:#38BDF8; font-weight:bold;">${cachedRoute.origin?.iata || 'DEP'} ➔ ${cachedRoute.destination?.iata || 'ARR'}</span>
+        </div>
+        <div class="dossier-row">
+          <span class="lbl">AIRLINE</span>
+          <span class="val">${cachedRoute.airline?.name || 'Commercial'}</span>
+        </div>
+        <div class="dossier-row">
+          <span class="lbl">AIRWAY DIST</span>
+          <span class="val">${cachedRoute.distance_km ? Math.round(cachedRoute.distance_km) + ' km' : '---'}</span>
+        </div>
+      `;
+    } else if (ac.callsign && !this.routeCache.has(ac.callsign)) {
+      // Trigger async fetch
+      this.routeCache.set(ac.callsign, null); // mark in flight
+      fetch(`/api/route/${encodeURIComponent(ac.callsign)}`)
+        .then((r) => r.json())
+        .then((routeData) => {
+          if (routeData && !routeData.error) {
+            this.routeCache.set(ac.callsign, routeData);
+            events.emit('aircraft:routeLoaded', routeData);
+            if (this.currentType === 'air' && this.currentId === ac.hex) {
+              this.renderAircraft(ac);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
     if (this.elGrid) {
       this.elGrid.innerHTML = `
+        ${routeHtml}
         <div class="dossier-row">
           <span class="lbl">ALTITUDE</span>
           <span class="val highlight">${(ac.alt_ft || 0).toLocaleString()} ft</span>
@@ -221,16 +285,15 @@ export class DossierPanel {
         </div>
         <div class="dossier-row">
           <span class="lbl">STATUS</span>
-          <span class="val">${ac.on_ground ? 'ON GROUND' : 'AIRBORNE'}</span>
+          <span class="val">${ac.on_ground ? 'ON GROUND' : (isMil ? 'TACTICAL PATROL' : 'AIRBORNE')}</span>
         </div>
       `;
     }
 
     const btnTrack = /** @type {HTMLElement|null} */ (this.element.querySelector('#btnDossierTrack'));
-    if (btnTrack) {
-      btnTrack.style.display = 'flex';
-      btnTrack.textContent = 'GROUND TRACK';
-    }
+    const btnCockpit = /** @type {HTMLElement|null} */ (this.element.querySelector('#btnDossierCockpit'));
+    if (btnTrack) btnTrack.style.display = 'none';
+    if (btnCockpit) btnCockpit.style.display = 'flex';
 
     this.element.style.display = 'flex';
   }

@@ -85,4 +85,101 @@ export function setupCameraControls(viewer) {
     state.camera.altKm = Math.round(carto.height / 1000);
     events.emit('camera:updated', state.camera);
   });
+
+  // Cockpit chase mode state
+  let cockpitTarget = null;
+  let isOblique = false;
+
+  // Pre-render loop to update cockpit chase camera at 60 FPS
+  scene.preRender.addEventListener(() => {
+    if (cockpitTarget && cockpitTarget.getPosition) {
+      const pos = cockpitTarget.getPosition();
+      const heading = cockpitTarget.getHeading ? cockpitTarget.getHeading() : 0;
+      if (pos) {
+        camera.lookAt(
+          pos,
+          new Cesium.HeadingPitchRange(
+            Cesium.Math.toRadians(heading),
+            Cesium.Math.toRadians(-12.0),
+            150.0 // 150m chase distance
+          )
+        );
+      }
+    }
+  });
+
+  function clearCockpitChase() {
+    if (cockpitTarget) {
+      cockpitTarget = null;
+      camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      events.emit('cockpit:state', { active: false });
+    }
+  }
+
+  // Subscribe to cockpit chase trigger
+  events.subscribe('cockpit:toggle', (target) => {
+    if (cockpitTarget) {
+      clearCockpitChase();
+    } else if (target && target.getPosition) {
+      cockpitTarget = target;
+      events.emit('cockpit:state', { active: true, target });
+    }
+  });
+
+  events.subscribe('cockpit:clear', () => {
+    clearCockpitChase();
+  });
+
+  // Horizon tilt toggle (T key or event)
+  function toggleTilt() {
+    clearCockpitChase();
+    const carto = camera.positionCartographic;
+    const height = carto.height;
+    isOblique = !isOblique;
+
+    camera.flyTo({
+      destination: Cesium.Cartesian3.fromRadians(
+        carto.longitude,
+        carto.latitude,
+        height
+      ),
+      orientation: {
+        heading: camera.heading,
+        pitch: Cesium.Math.toRadians(isOblique ? -35.0 : -90.0),
+        roll: 0.0,
+      },
+      duration: 1.2,
+    });
+    events.emit('camera:tiltChanged', { oblique: isOblique });
+  }
+
+  events.subscribe('camera:toggleTilt', toggleTilt);
+
+  // Jump to location (city or coordinates)
+  events.subscribe('camera:jumpTo', ({ lat, lon, heightM = 500000 }) => {
+    clearCockpitChase();
+    camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, heightM),
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(isOblique ? -35.0 : -90.0),
+        roll: 0.0,
+      },
+      duration: 1.6,
+    });
+  });
+
+  // Keyboard shortcut listener: C for Cockpit, T for Tilt, Esc to reset
+  window.addEventListener('keydown', (e) => {
+    // Ignore if typing inside input / search bar
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return;
+
+    if (e.key === 'c' || e.key === 'C') {
+      events.emit('intent:TOGGLE_COCKPIT', null);
+    } else if (e.key === 't' || e.key === 'T') {
+      toggleTilt();
+    } else if (e.key === 'Escape') {
+      clearCockpitChase();
+    }
+  });
 }

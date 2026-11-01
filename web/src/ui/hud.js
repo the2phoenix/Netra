@@ -55,8 +55,32 @@ export function initHUD(root) {
         <span>FIRMS</span>
       </div>
     </div>
+    <div class="hud-controls">
+      <button class="hud-ctrl-btn" id="btnQuickSearch" title="Quick Search City or Coordinates (/)">
+        <span>🔍</span> SEARCH [/]
+      </button>
+      <button class="hud-ctrl-btn" id="btnHorizonTilt" title="Toggle 35° Oblique Horizon Tilt (T)">
+        <span>🌐</span> TILT [T]
+      </button>
+      <button class="hud-ctrl-btn" id="btnAboutModal" title="System Architecture & Credits">
+        <span>ℹ</span> ABOUT
+      </button>
+    </div>
   `;
   root.appendChild(topbar);
+
+  // Floating Altitude & Classification Legend Pill
+  const legendPill = document.createElement('div');
+  legendPill.className = 'hud-legend-pill';
+  legendPill.id = 'hudLegendPill';
+  legendPill.innerHTML = `
+    <span class="legend-item"><span class="legend-dot white"></span> >30k ft</span>
+    <span class="legend-item"><span class="legend-dot cyan"></span> 10-30k ft</span>
+    <span class="legend-item"><span class="legend-dot teal"></span> &lt;10k ft</span>
+    <span class="legend-item"><span class="legend-dot amber"></span> MILITARY</span>
+    <span class="legend-item"><span class="legend-dot red"></span> 7700 ALERT</span>
+  `;
+  root.appendChild(legendPill);
 
   // Reticle
   const reticle = document.createElement('div');
@@ -89,6 +113,26 @@ export function initHUD(root) {
   const badgeAdsb = document.getElementById('badgeAdsb');
   const badgeUsgs = document.getElementById('badgeUsgs');
   const badgeFirms = document.getElementById('badgeFirms');
+  const btnSearch = document.getElementById('btnQuickSearch');
+  const btnTilt = document.getElementById('btnHorizonTilt');
+  const btnAbout = document.getElementById('btnAboutModal');
+
+  if (btnSearch) {
+    btnSearch.addEventListener('click', () => events.emit('quicksearch:open', null));
+  }
+  if (btnTilt) {
+    btnTilt.addEventListener('click', () => events.emit('camera:toggleTilt', null));
+  }
+  if (btnAbout) {
+    btnAbout.addEventListener('click', () => events.emit('about:open', null));
+  }
+
+  // Layer visibility updates legend
+  events.subscribe('state:layers', (layers) => {
+    if (legendPill) {
+      legendPill.style.display = layers.aircraft ? 'flex' : 'none';
+    }
+  });
 
   // Event subscriptions
   events.subscribe('clock:tick', ({ utcString }) => {

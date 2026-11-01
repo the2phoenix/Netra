@@ -39,7 +39,7 @@ HUBS: List[HubItem] = [
 ADSB_LOL_BASE = "https://api.adsb.lol/v2"
 
 
-def normalize_aircraft(raw: dict) -> Optional[AircraftItem]:
+def normalize_aircraft(raw: dict, is_military: bool = False) -> Optional[AircraftItem]:
     """Normalize readsb JSON object into AircraftItem per T-API-05..07.
 
     - Drops items without lat and lon (T-API-06).
@@ -102,6 +102,10 @@ def normalize_aircraft(raw: dict) -> Optional[AircraftItem]:
     except (ValueError, TypeError):
         seen_s = 0.0
 
+    # Check dbFlags for military tag
+    db_flags = raw.get("dbFlags", 0)
+    is_mil = is_military or bool(db_flags & 1)
+
     return AircraftItem(
         hex=hex_code.lower().strip(),
         callsign=callsign,
@@ -115,6 +119,7 @@ def normalize_aircraft(raw: dict) -> Optional[AircraftItem]:
         squawk=squawk,
         seen_s=seen_s,
         on_ground=on_ground,
+        is_military=is_mil,
     )
 
 
@@ -248,12 +253,43 @@ def sample_global_flights(items: List[AircraftItem], limit: int = 3000) -> List[
 
 # Module-level memory cache to avoid burst rate limits and prevent 429
 _HUB_CACHE: Dict[str, List[AircraftItem]] = {}
+_MIL_CACHE: List[AircraftItem] = []
+_MIL_LAST_FETCH = 0.0
 _ROTATION_INDEX = 0
+
+
+async def fetch_military_aircraft(client: httpx.AsyncClient) -> List[AircraftItem]:
+    """Fetch live worldwide military flights from adsb.lol /v2/mil."""
+    url = f"{ADSB_LOL_BASE}/mil"
+    headers = {"User-Agent": "netra-demo/0.1 (student project; tactical view)"}
+    try:
+        response = await client.get(url, headers=headers, timeout=6.0)
+        response.raise_for_status()
+        data = response.json()
+        raw_ac = data.get("ac", [])
+        items = []
+        for r in raw_ac:
+            ac = normalize_aircraft(r, is_military=True)
+            if ac and not ac.on_ground:
+                items.append(ac)
+        return items
+    except Exception as e:
+        logger.warning(f"Military flights fetch failed: {e}")
+        return []
 
 
 async def fetch_all_flights(client: httpx.AsyncClient) -> List[AircraftItem]:
     """Fetch flights smoothly across international hubs with rotating rate-limiting."""
-    global _ROTATION_INDEX
+    global _ROTATION_INDEX, _MIL_CACHE, _MIL_LAST_FETCH
+    import time
+
+    # Periodically fetch live military traffic (every 25 seconds)
+    now = time.time()
+    if now - _MIL_LAST_FETCH > 25.0:
+        mil_items = await fetch_military_aircraft(client)
+        if mil_items:
+            _MIL_CACHE = mil_items
+        _MIL_LAST_FETCH = now
 
     # Fetch 2 hubs per cycle with polite delay to avoid Envoy/istio 429 burst limiter
     num_hubs = len(HUBS)
@@ -269,6 +305,9 @@ async def fetch_all_flights(client: httpx.AsyncClient) -> List[AircraftItem]:
         await asyncio.sleep(0.3)
 
     cached_lists = list(_HUB_CACHE.values())
+    if _MIL_CACHE:
+        cached_lists.append(_MIL_CACHE)
+
     merged = merge_hub_results(cached_lists) if cached_lists else []
 
     # Supplement with global flight corridors if live coverage is sparse (< 250 aircraft)

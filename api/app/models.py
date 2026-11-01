@@ -63,6 +63,7 @@ class AircraftItem(BaseModel):
     squawk: Optional[str] = None
     seen_s: float = 0.0
     on_ground: bool = False
+    is_military: bool = False
 
 
 class FlightsResponse(BaseModel):
@@ -126,3 +127,30 @@ class FiresResponse(BaseModel):
     replay: bool = False
     count: int
     items: List[FireItem]
+
+
+class AirportInfo(BaseModel):
+    iata: str
+    icao: Optional[str] = None
+    name: str
+    city: Optional[str] = None
+    country: Optional[str] = None
+    lat: float
+    lon: float
+
+
+class AirlineInfo(BaseModel):
+    name: str
+    icao: Optional[str] = None
+    iata: Optional[str] = None
+    callsign: Optional[str] = None
+
+
+class FlightRouteResponse(BaseModel):
+    callsign: str
+    airline: Optional[AirlineInfo] = None
+    origin: Optional[AirportInfo] = None
+    destination: Optional[AirportInfo] = None
+    distance_km: Optional[float] = None
+    source: str = "adsbdb"
+

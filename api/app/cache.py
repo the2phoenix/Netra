@@ -79,8 +79,15 @@ class TTLCache:
                 "ttl_s": entry.ttl_s,
                 "last_error": entry.last_error,
             }
+            def _serialize(obj):
+                if hasattr(obj, "model_dump"):
+                    return obj.model_dump()
+                if hasattr(obj, "dict"):
+                    return obj.dict()
+                return str(obj)
+
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(payload, f)
+                json.dump(payload, f, default=_serialize)
         except Exception as e:
             logger.warning(f"Failed to write disk cache for {key}: {e}")
 

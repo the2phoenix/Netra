@@ -250,6 +250,43 @@ def test_usgs_geojson_parsing():
     assert items[0].depth_km == 18.5
 
 
+@pytest.mark.asyncio
+async def test_route_lookup_corridor_fallback():
+    """Route endpoint returns valid origin/destination and distance."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/route/AIC101")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["callsign"] == "AIC101"
+        assert data["origin"]["iata"] == "DEL"
+        assert data["destination"]["iata"] == "JFK"
+        assert data["distance_km"] > 10000
+        assert data["airline"]["name"] == "Air India"
+
+
+@pytest.mark.asyncio
+async def test_route_lookup_empty_callsign():
+    """Empty or missing callsign returns 400."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/route/%20")
+        assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_military_tagging_in_flights():
+    """Military flights include is_military=True tag."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/flights")
+        assert res.status_code == 200
+        data = res.json()
+        mil_items = [it for it in data["items"] if it.get("is_military")]
+        assert len(mil_items) >= 1
+
+
+
 def test_firms_csv_parsing():
     """Check FIRMS CSV parser sorts by highest FRP first."""
     from app.upstream.firms import parse_firms_csv

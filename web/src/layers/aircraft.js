@@ -13,6 +13,31 @@ import { SquawkAlertManager } from '../geo/scan.js';
 import { createAircraftCanvas } from './aircraftSprite.js';
 
 /**
+ * Generates an array of Cartesian3 points along a geodesic spherical arc at given altitude.
+ * Prevents straight-chord clipping under Earth curvature.
+ *
+ * @param {number} startLat
+ * @param {number} startLon
+ * @param {number} endLat
+ * @param {number} endLon
+ * @param {number} altM
+ * @param {number} [numPoints=5]
+ * @returns {Array<Cesium.Cartesian3>}
+ */
+function computeGeodesicArcPoints(startLat, startLon, endLat, endLon, altM, numPoints = 5) {
+  const startCarto = Cesium.Cartographic.fromDegrees(startLon, startLat);
+  const endCarto = Cesium.Cartographic.fromDegrees(endLon, endLat);
+  const geodesic = new Cesium.EllipsoidGeodesic(startCarto, endCarto);
+  const points = [];
+  for (let i = 0; i <= numPoints; i++) {
+    const frac = i / numPoints;
+    const carto = geodesic.interpolateUsingFraction(frac);
+    points.push(Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, altM));
+  }
+  return points;
+}
+
+/**
  * High-performance GPU-instanced live aircraft layer.
  * Updates dead reckoning every animation frame to ensure silky 60 FPS motion without stuttering.
  */
@@ -62,11 +87,23 @@ export class AircraftLayer {
     this.colorCyan = Cesium.Color.fromCssColorString('#35D0E8'); // 10k - 30k ft
     this.colorWhite = Cesium.Color.WHITE;                       // > 30k ft
     this.colorAlert = Cesium.Color.fromCssColorString('#EF4444'); // Squawk 7700 / 7600 / 7500
+    this.colorMilitary = Cesium.Color.fromCssColorString('#F59E0B'); // Military Amber / Gold
     this.routeColorTeal = Cesium.Color.fromCssColorString('#2DD4BF').withAlpha(0.40);
     this.routeColorCyan = Cesium.Color.fromCssColorString('#35D0E8').withAlpha(0.45);
     this.routeColorWhite = Cesium.Color.WHITE.withAlpha(0.35);
     this.routeColorAlert = Cesium.Color.fromCssColorString('#EF4444').withAlpha(0.95);
+    this.routeColorMilitary = Cesium.Color.fromCssColorString('#F59E0B').withAlpha(0.60);
     this.squawkManager = new SquawkAlertManager();
+
+    // Selected flight great-circle complete route arc (adsbdb.com)
+    this.selectedRoutePolyline = this.polylineCollection.add({
+      positions: [],
+      width: 3.5,
+      material: Cesium.Material.fromType('Color', {
+        color: Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.85),
+      }),
+      show: false,
+    });
 
     // Hook frame render loop
     this.removePreRender = viewer.scene.preRender.addEventListener(this.onPreRender.bind(this));
@@ -93,6 +130,35 @@ export class AircraftLayer {
 
     events.subscribe('dossier:clearAircraft', () => {
       this.clearSelection();
+    });
+
+    // Handle Cockpit Chase toggle from C key or Dossier button
+    events.subscribe('intent:TOGGLE_COCKPIT', () => {
+      if (this.selectedHex) {
+        const entry = this.aircraftMap.get(this.selectedHex);
+        if (entry) {
+          events.emit('cockpit:toggle', {
+            getPosition: () => entry.billboard.position,
+            getHeading: () => entry.trackDeg,
+          });
+        }
+      }
+    });
+
+    // Render complete great-circle route arc when enriched route arrives
+    events.subscribe('aircraft:routeLoaded', (route) => {
+      if (route && route.origin && route.destination && this.selectedHex) {
+        const arcPoints = computeGeodesicArcPoints(
+          route.origin.lat,
+          route.origin.lon,
+          route.destination.lat,
+          route.destination.lon,
+          36000 * FT_TO_M,
+          28
+        );
+        this.selectedRoutePolyline.positions = arcPoints;
+        this.selectedRoutePolyline.show = true;
+      }
     });
   }
 
@@ -128,12 +194,15 @@ export class AircraftLayer {
       const gsMps = item.gs_kt * KT_TO_MPS;
       const vsMps = (item.vs_fpm || 0) * FPM_TO_MPS;
 
-      // Color based on emergency squawk or altitude
+      // Color based on emergency squawk, military, or altitude band
       let color = this.colorCyan;
       let routeColor = this.routeColorCyan;
       if (['7700', '7600', '7500'].includes(item.squawk)) {
         color = this.colorAlert;
         routeColor = this.routeColorAlert;
+      } else if (item.is_military) {
+        color = this.colorMilitary;
+        routeColor = this.routeColorMilitary;
       } else if (item.alt_ft < 10000) {
         color = this.colorTeal;
         routeColor = this.routeColorTeal;
@@ -144,33 +213,37 @@ export class AircraftLayer {
 
       let entry = this.aircraftMap.get(hex);
       if (entry) {
-        // Blend in new fix over 500 ms (REQ FLT-01, T-GEO-13)
-        entry.prevDisplayPos = { ...entry.displayPos };
-        entry.targetPos = { lat: item.lat, lon: item.lon, altM };
+        // Blend in new fix over 500 ms only if target actually shifted
+        const dLat = Math.abs(item.lat - entry.targetPos.lat);
+        const dLon = Math.abs(item.lon - entry.targetPos.lon);
+        if (dLat > 0.0005 || dLon > 0.0005) {
+          entry.prevDisplayPos = { ...entry.displayPos };
+          entry.targetPos = { lat: item.lat, lon: item.lon, altM };
+          entry.easeStartTime = now;
+        }
         entry.item = item;
         entry.gsMps = gsMps;
         entry.vsMps = vsMps;
         entry.trackDeg = item.track_deg;
         entry.t0 = now;
-        entry.easeStartTime = now;
         entry.billboard.color = color;
         if (entry.routePolyline) {
           entry.routePolyline.material.uniforms.color = routeColor;
         }
       } else {
-        // Create new billboard primitive with adaptive distance scaling (prominent aircraft size)
+        // Create new billboard primitive with prominent scale and crisp visibility from space
         const pos = Cesium.Cartesian3.fromDegrees(item.lon, item.lat, altM);
         const billboard = this.collection.add({
           position: pos,
           image: this.spriteCanvas,
-          scale: 0.75,
-          scaleByDistance: new Cesium.NearFarScalar(4.0e5, 1.1, 9.0e6, 0.22),
+          scale: 1.15,
+          scaleByDistance: new Cesium.NearFarScalar(3.0e5, 1.4, 1.5e7, 0.55),
           color: color,
           rotation: Cesium.Math.toRadians(item.track_deg),
           id: hex,
         });
 
-        // 15-minute forward projected flight route vector
+        // 15-minute forward projected flight route vector (spherical geodesic arc)
         const forwardPred = predictPosition({
           lat: item.lat,
           lon: item.lon,
@@ -180,14 +253,17 @@ export class AircraftLayer {
           dtSeconds: 900,
           clampDt: 1800,
         });
-        const forwardPos = Cesium.Cartesian3.fromDegrees(
-          forwardPred.lon,
+        const arcPositions = computeGeodesicArcPoints(
+          item.lat,
+          item.lon,
           forwardPred.lat,
-          forwardPred.altM
+          forwardPred.lon,
+          altM,
+          4
         );
         const routePolyline = this.polylineCollection.add({
-          positions: [pos, forwardPos],
-          width: ['7700', '7600', '7500'].includes(item.squawk) ? 2.5 : 1.2,
+          positions: arcPositions,
+          width: ['7700', '7600', '7500'].includes(item.squawk) ? 2.8 : (item.is_military ? 2.0 : 1.4),
           material: Cesium.Material.fromType('Color', { color: routeColor }),
         });
 
@@ -242,7 +318,7 @@ export class AircraftLayer {
     if (!this.collection.show || this.aircraftMap.size === 0) return;
 
     const now = Date.now();
-    const visualMultiplier = 6.0; // 6x perceptible visual radar motion
+    const visualMultiplier = 12.0; // 12x perceptible smooth radar motion
 
     for (const [, entry] of this.aircraftMap.entries()) {
       const dt = ((now - entry.t0) / 1000) * visualMultiplier;
@@ -280,7 +356,7 @@ export class AircraftLayer {
       entry.billboard.position = pos;
       entry.billboard.rotation = Cesium.Math.toRadians(entry.trackDeg);
 
-      // Dynamically update the forward flight route vector
+      // Dynamically update the forward flight route vector (geodesic spherical arc)
       if (entry.routePolyline) {
         const forward = predictPosition({
           lat: entry.displayPos.lat,
@@ -292,12 +368,14 @@ export class AircraftLayer {
           dtSeconds: 900,
           clampDt: 1800,
         });
-        const forwardPos = Cesium.Cartesian3.fromDegrees(
-          forward.lon,
+        entry.routePolyline.positions = computeGeodesicArcPoints(
+          entry.displayPos.lat,
+          entry.displayPos.lon,
           forward.lat,
-          forward.altM
+          forward.lon,
+          entry.displayPos.altM,
+          4
         );
-        entry.routePolyline.positions = [Cesium.Cartesian3.clone(pos), forwardPos];
       }
 
       // Selected aircraft tracking
@@ -352,9 +430,12 @@ export class AircraftLayer {
     this.selectedHex = null;
     this.highlightPoint.show = false;
     this.trailPolyline.show = false;
+    this.selectedRoutePolyline.show = false;
+    this.selectedRoutePolyline.positions = [];
     this.trailPositions = [];
     state.set('selected', null);
     events.emit('aircraft:deselected', null);
+    events.emit('cockpit:clear', null);
   }
 
   flyToSelected() {

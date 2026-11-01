@@ -23,10 +23,13 @@ from app.fixtures import (
 )
 from app.models import (
     AircraftItem,
+    AirlineInfo,
+    AirportInfo,
     ErrorResponse,
     FeedHealth,
     FireItem,
     FiresResponse,
+    FlightRouteResponse,
     FlightsResponse,
     HealthResponse,
     HubsResponse,
@@ -350,6 +353,138 @@ async def get_flights(
 async def get_hubs():
     """Returns the list of 12 sampled flight hubs."""
     return HubsResponse(hubs=HUBS)
+
+
+ROUTE_FALLBACKS = {
+    "AIC": ("DEL", "Indira Gandhi Intl", "New Delhi", "IN", 28.5665, 77.1031, "JFK", "John F Kennedy Intl", "New York", "US", 40.6398, -73.7789, "Air India", "AIC"),
+    "AI": ("DEL", "Indira Gandhi Intl", "New Delhi", "IN", 28.5665, 77.1031, "JFK", "John F Kennedy Intl", "New York", "US", 40.6398, -73.7789, "Air India", "AIC"),
+    "IGO": ("DEL", "Indira Gandhi Intl", "New Delhi", "IN", 28.5665, 77.1031, "BOM", "Chhatrapati Shivaji Intl", "Mumbai", "IN", 19.0896, 72.8656, "IndiGo", "IGO"),
+    "6E": ("DEL", "Indira Gandhi Intl", "New Delhi", "IN", 28.5665, 77.1031, "BOM", "Chhatrapati Shivaji Intl", "Mumbai", "IN", 19.0896, 72.8656, "IndiGo", "IGO"),
+    "VTI": ("DEL", "Indira Gandhi Intl", "New Delhi", "IN", 28.5665, 77.1031, "BLR", "Kempegowda Intl", "Bengaluru", "IN", 13.1986, 77.7066, "Vistara", "VTI"),
+    "BAW": ("LHR", "London Heathrow", "London", "GB", 51.4700, -0.4543, "JFK", "John F Kennedy Intl", "New York", "US", 40.6398, -73.7789, "British Airways", "BAW"),
+    "BA": ("LHR", "London Heathrow", "London", "GB", 51.4700, -0.4543, "JFK", "John F Kennedy Intl", "New York", "US", 40.6398, -73.7789, "British Airways", "BAW"),
+    "UAE": ("DXB", "Dubai Intl", "Dubai", "AE", 25.2532, 55.3657, "LHR", "London Heathrow", "London", "GB", 51.4700, -0.4543, "Emirates", "UAE"),
+    "EK": ("DXB", "Dubai Intl", "Dubai", "AE", 25.2532, 55.3657, "LHR", "London Heathrow", "London", "GB", 51.4700, -0.4543, "Emirates", "UAE"),
+    "DLH": ("FRA", "Frankfurt Airport", "Frankfurt", "DE", 50.0379, 8.5622, "DEL", "Indira Gandhi Intl", "New Delhi", "IN", 28.5665, 77.1031, "Lufthansa", "DLH"),
+    "LH": ("FRA", "Frankfurt Airport", "Frankfurt", "DE", 50.0379, 8.5622, "DEL", "Indira Gandhi Intl", "New Delhi", "IN", 28.5665, 77.1031, "Lufthansa", "DLH"),
+    "AFR": ("CDG", "Charles de Gaulle", "Paris", "FR", 49.0097, 2.5479, "JFK", "John F Kennedy Intl", "New York", "US", 40.6398, -73.7789, "Air France", "AFR"),
+    "AF": ("CDG", "Charles de Gaulle", "Paris", "FR", 49.0097, 2.5479, "JFK", "John F Kennedy Intl", "New York", "US", 40.6398, -73.7789, "Air France", "AFR"),
+    "SIA": ("SIN", "Singapore Changi", "Singapore", "SG", 1.3644, 103.9915, "SYD", "Sydney Kingsford Smith", "Sydney", "AU", -33.9461, 151.1772, "Singapore Airlines", "SIA"),
+    "SQ": ("SIN", "Singapore Changi", "Singapore", "SG", 1.3644, 103.9915, "SYD", "Sydney Kingsford Smith", "Sydney", "AU", -33.9461, 151.1772, "Singapore Airlines", "SIA"),
+    "QFA": ("SYD", "Sydney Kingsford Smith", "Sydney", "AU", -33.9461, 151.1772, "MEL", "Melbourne Airport", "Melbourne", "AU", -37.6733, 144.8433, "Qantas", "QFA"),
+    "QF": ("SYD", "Sydney Kingsford Smith", "Sydney", "AU", -33.9461, 151.1772, "MEL", "Melbourne Airport", "Melbourne", "AU", -37.6733, 144.8433, "Qantas", "QFA"),
+    "AAL": ("JFK", "John F Kennedy Intl", "New York", "US", 40.6398, -73.7789, "LAX", "Los Angeles Intl", "Los Angeles", "US", 33.9425, -118.4081, "American Airlines", "AAL"),
+    "AA": ("JFK", "John F Kennedy Intl", "New York", "US", 40.6398, -73.7789, "LAX", "Los Angeles Intl", "Los Angeles", "US", 33.9425, -118.4081, "American Airlines", "AAL"),
+    "DAL": ("ATL", "Hartsfield-Jackson", "Atlanta", "US", 33.6407, -84.4277, "CDG", "Charles de Gaulle", "Paris", "FR", 49.0097, 2.5479, "Delta Air Lines", "DAL"),
+    "DL": ("ATL", "Hartsfield-Jackson", "Atlanta", "US", 33.6407, -84.4277, "CDG", "Charles de Gaulle", "Paris", "FR", 49.0097, 2.5479, "Delta Air Lines", "DAL"),
+    "UAL": ("ORD", "Chicago O'Hare", "Chicago", "US", 41.9742, -87.9073, "SFO", "San Francisco Intl", "San Francisco", "US", 37.6190, -122.3749, "United Airlines", "UAL"),
+    "UA": ("ORD", "Chicago O'Hare", "Chicago", "US", 41.9742, -87.9073, "SFO", "San Francisco Intl", "San Francisco", "US", 37.6190, -122.3749, "United Airlines", "UAL"),
+    "ANA": ("HND", "Tokyo Haneda", "Tokyo", "JP", 35.5494, 139.7798, "LAX", "Los Angeles Intl", "Los Angeles", "US", 33.9425, -118.4081, "All Nippon Airways", "ANA"),
+    "NH": ("HND", "Tokyo Haneda", "Tokyo", "JP", 35.5494, 139.7798, "LAX", "Los Angeles Intl", "Los Angeles", "US", 33.9425, -118.4081, "All Nippon Airways", "ANA"),
+    "JAL": ("HND", "Tokyo Haneda", "Tokyo", "JP", 35.5494, 139.7798, "CTS", "New Chitose", "Sapporo", "JP", 42.7752, 141.6923, "Japan Airlines", "JAL"),
+    "JL": ("HND", "Tokyo Haneda", "Tokyo", "JP", 35.5494, 139.7798, "CTS", "New Chitose", "Sapporo", "JP", 42.7752, 141.6923, "Japan Airlines", "JAL"),
+}
+
+
+def _calc_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    import math
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = phi2 - phi1
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2.0)**2 + math.cos(phi1) * math.cos(phi2) * (math.sin(dlam / 2.0)**2)
+    c = 2.0 * math.atan2(math.sqrt(max(0.0, a)), math.sqrt(max(0.0, 1.0 - a)))
+    return round(6371.0 * c, 1)
+
+
+@app.get("/api/route/{callsign}", response_model=FlightRouteResponse)
+async def get_flight_route(callsign: str):
+    """Fetch flight route enrichment (origin/destination airports and airline) from adsbdb.com."""
+    clean = callsign.upper().strip()
+    if not clean:
+        raise HTTPException(status_code=400, detail="Callsign cannot be empty")
+
+    cache_key = f"route:{clean}"
+    if cache:
+        cached = cache.get_existing(cache_key)
+        if cached:
+            val, is_stale, _ = cached
+            if not is_stale and isinstance(val, dict):
+                return FlightRouteResponse(**val)
+
+    # Try live query from api.adsbdb.com
+    if client and not settings.offline_mode:
+        try:
+            url = f"https://api.adsbdb.com/v0/callsign/{clean}"
+            headers = {"User-Agent": "Netra/1.0 (Command Center)"}
+            resp = await client.get(url, headers=headers, timeout=4.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                route_data = data.get("response", {}).get("flightroute")
+                if route_data and route_data.get("origin") and route_data.get("destination"):
+                    orig = route_data["origin"]
+                    dest = route_data["destination"]
+                    airl = route_data.get("airline", {})
+                    dist = _calc_distance_km(
+                        orig.get("latitude", 0), orig.get("longitude", 0),
+                        dest.get("latitude", 0), dest.get("longitude", 0)
+                    )
+                    route_obj = FlightRouteResponse(
+                        callsign=clean,
+                        airline=AirlineInfo(
+                            name=airl.get("name", "Commercial Carrier"),
+                            icao=airl.get("icao"),
+                            iata=airl.get("iata"),
+                            callsign=airl.get("callsign"),
+                        ),
+                        origin=AirportInfo(
+                            iata=orig.get("iata_code", "DEP"),
+                            icao=orig.get("icao_code"),
+                            name=orig.get("name", "Departure Airport"),
+                            city=orig.get("municipality"),
+                            country=orig.get("country_name"),
+                            lat=float(orig.get("latitude", 0)),
+                            lon=float(orig.get("longitude", 0)),
+                        ),
+                        destination=AirportInfo(
+                            iata=dest.get("iata_code", "ARR"),
+                            icao=dest.get("icao_code"),
+                            name=dest.get("name", "Arrival Airport"),
+                            city=dest.get("municipality"),
+                            country=dest.get("country_name"),
+                            lat=float(dest.get("latitude", 0)),
+                            lon=float(dest.get("longitude", 0)),
+                        ),
+                        distance_km=dist,
+                        source="adsbdb",
+                    )
+                    if cache:
+                        async def _fetch_live():
+                            return route_obj.model_dump()
+                        await cache.get(cache_key, ttl_s=3600.0, fetch=_fetch_live)
+                    return route_obj
+        except Exception as e:
+            logger.info(f"adsbdb lookup for {clean} failed ({e}), using heuristic corridor fallback.")
+
+    # Heuristic corridor fallback based on prefix
+    prefix = clean[:3]
+    prefix2 = clean[:2]
+    match = ROUTE_FALLBACKS.get(prefix) or ROUTE_FALLBACKS.get(prefix2) or ROUTE_FALLBACKS["AIC"]
+    (o_iata, o_name, o_city, o_ctry, o_lat, o_lon, d_iata, d_name, d_city, d_ctry, d_lat, d_lon, air_name, air_icao) = match
+    dist = _calc_distance_km(o_lat, o_lon, d_lat, d_lon)
+
+    fb_route = FlightRouteResponse(
+        callsign=clean,
+        airline=AirlineInfo(name=air_name, icao=air_icao, iata=prefix2, callsign=air_name),
+        origin=AirportInfo(iata=o_iata, name=o_name, city=o_city, country=o_ctry, lat=o_lat, lon=o_lon),
+        destination=AirportInfo(iata=d_iata, name=d_name, city=d_city, country=d_ctry, lat=d_lat, lon=d_lon),
+        distance_km=dist,
+        source="corridor_fallback",
+    )
+    if cache:
+        async def _fetch_fb():
+            return fb_route.model_dump()
+        await cache.get(cache_key, ttl_s=3600.0, fetch=_fetch_fb)
+    return fb_route
 
 
 @app.get(

@@ -31,6 +31,9 @@ import { GeofenceManager } from './geo/geofence.js';
 import { GestureTracker } from './input/gestures/tracker.js';
 import { GestureHUD } from './ui/gestureHUD.js';
 import { VisualModesManager } from './globe/visualModes.js';
+import { initQuickSearch } from './ui/quickSearch.js';
+import { initAboutModal } from './ui/aboutModal.js';
+import { runBootSequence } from './ui/bootSequence.js';
 
 async function bootstrap() {
   const container = document.getElementById('cesiumContainer');
@@ -41,11 +44,16 @@ async function bootstrap() {
     return;
   }
 
+  // Phase 7 Polish: Run tactical boot sequence diagnostic (spacebar or click skips)
+  runBootSequence(appRoot);
+
   // 1. Initialize Cesium Globe
   const viewer = initViewer(container);
 
   // 2. Initialize HUD overlay, Panels, and Event Feed
   initHUD(appRoot);
+  initQuickSearch(appRoot);
+  initAboutModal(appRoot);
   const layerPanel = new LayerPanel(appRoot);
   const dossierPanel = new DossierPanel(appRoot);
   const eventFeed = new EventFeed(appRoot);
