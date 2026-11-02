@@ -59,7 +59,7 @@ export class AircraftLayer {
       outlineWidth: 2,
       pixelSize: 24,
       show: false,
-      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      disableDepthTestDistance: 35000.0,
     });
 
     // Trail polyline for selected aircraft
@@ -221,6 +221,27 @@ export class AircraftLayer {
           entry.prevDisplayPos = { ...entry.displayPos };
           entry.targetPos = { lat: item.lat, lon: item.lon, altM };
           entry.easeStartTime = now;
+
+          // Update forward flight vector only when position changes from upstream fix
+          if (entry.routePolyline) {
+            const forwardPred = predictPosition({
+              lat: item.lat,
+              lon: item.lon,
+              altM,
+              gsMps: Math.max(gsMps, 150),
+              trackDeg: item.track_deg,
+              dtSeconds: 900,
+              clampDt: 1800,
+            });
+            entry.routePolyline.positions = computeGeodesicArcPoints(
+              item.lat,
+              item.lon,
+              forwardPred.lat,
+              forwardPred.lon,
+              altM,
+              4
+            );
+          }
         }
         entry.item = item;
         entry.gsMps = gsMps;
@@ -232,17 +253,17 @@ export class AircraftLayer {
           entry.routePolyline.material.uniforms.color = routeColor;
         }
       } else {
-        // Create new billboard primitive with prominent scale and crisp visibility from space
+        // Create new billboard primitive with balanced scaling and depth-tested occlusion
         const pos = Cesium.Cartesian3.fromDegrees(item.lon, item.lat, altM);
         const billboard = this.collection.add({
           position: pos,
           image: this.spriteCanvas,
-          scale: 1.25,
-          scaleByDistance: new Cesium.NearFarScalar(1.0e4, 1.8, 3.5e7, 0.9),
+          scale: 0.85,
+          scaleByDistance: new Cesium.NearFarScalar(1.0e3, 0.95, 2.5e7, 0.55),
           color: color,
           rotation: Cesium.Math.toRadians(item.track_deg),
           id: hex,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: 35000.0,
         });
 
         // 15-minute forward projected flight route vector (spherical geodesic arc)
@@ -357,28 +378,6 @@ export class AircraftLayer {
 
       entry.billboard.position = pos;
       entry.billboard.rotation = Cesium.Math.toRadians(entry.trackDeg);
-
-      // Dynamically update the forward flight route vector (geodesic spherical arc)
-      if (entry.routePolyline) {
-        const forward = predictPosition({
-          lat: entry.displayPos.lat,
-          lon: entry.displayPos.lon,
-          altM: entry.displayPos.altM,
-          gsMps: Math.max(entry.gsMps, 150),
-          trackDeg: entry.trackDeg,
-          vsMps: entry.vsMps,
-          dtSeconds: 900,
-          clampDt: 1800,
-        });
-        entry.routePolyline.positions = computeGeodesicArcPoints(
-          entry.displayPos.lat,
-          entry.displayPos.lon,
-          forward.lat,
-          forward.lon,
-          entry.displayPos.altM,
-          4
-        );
-      }
 
       // Selected aircraft tracking
       if (this.selectedHex === entry.hex) {

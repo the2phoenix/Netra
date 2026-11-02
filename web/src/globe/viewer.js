@@ -148,15 +148,22 @@ export function initViewer(container) {
     scene.skyAtmosphere.atmosphereLightIntensity = 2.5;
   }
 
-  // Disable default screen space controls; Netra's Intent Engine controls camera
+  // Configure Cesium's high-performance native ScreenSpaceCameraController
+  // Provides butter-smooth 60+ FPS momentum-based globe dragging, surface ray-locking, and 3D tilt
   const controller = scene.screenSpaceCameraController;
-  controller.enableRotate = false;
-  controller.enableTranslate = false;
-  controller.enableZoom = false;
-  controller.enableTilt = false;
-  controller.enableLook = false;
+  controller.enableRotate = true;
+  controller.enableTranslate = true;
+  controller.enableZoom = true;
+  controller.enableTilt = true;
+  controller.enableLook = true;
+  controller.inertiaSpin = 0.88;
+  controller.inertiaTranslate = 0.88;
+  controller.inertiaZoom = 0.82;
+  controller.minimumZoomDistance = 150.0;
+  controller.maximumZoomDistance = 40000000.0;
+  controller.enableCollisionDetection = true;
 
-  // Bind custom intent camera controls
+  // Bind custom intent camera controls (cockpit chase, gestures, camera telemetry)
   setupCameraControls(viewer);
 
   // Set initial camera perspective (global orbit view showing full Earth)

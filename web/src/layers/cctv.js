@@ -140,7 +140,7 @@ export class CCTVLayer {
         height: 30,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        disableDepthTestDistance: 20000.0,
       });
 
       const label = this.labels.add({
@@ -152,7 +152,7 @@ export class CCTVLayer {
         outlineWidth: 3,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -22),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        disableDepthTestDistance: 20000.0,
       });
 
       const entry = { billboard, label, data: node };
